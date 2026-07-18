@@ -1,0 +1,10 @@
+<Project>
+  <PropertyGroup>
+    <LangVersion>12</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Company>Dashboard Pro</Company>
+    <Product>Dashboard Pro</Product>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,10 @@
+<UserControl
+    x:Class="DashboardPro.App.Modules.TopTasksModule"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <StackPanel Spacing="6">
+        <StackPanel x:Name="ListPanel" Spacing="4" />
+        <TextBox x:Name="NewTaskBox" PlaceholderText="Новая задача — Enter" KeyDown="OnNewTaskKeyDown" />
+    </StackPanel>
+</UserControl>
