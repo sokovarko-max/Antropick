@@ -1,0 +1,64 @@
+<Window
+    x:Class="DashboardPro.App.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:DashboardPro.App.Controls">
+
+    <Grid x:Name="Root" Padding="10,10,10,10" RowSpacing="8">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Шапка панели -->
+        <Grid Grid.Row="0" ColumnSpacing="6">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Text="Dashboard Pro" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
+
+            <Button x:Name="AddModuleButton" Grid.Column="1" Style="{StaticResource ModuleIconButtonStyle}"
+                    Click="OnAddModuleClick" ToolTipService.ToolTip="Добавить модуль">
+                <FontIcon Glyph="&#xE710;" FontSize="14" />
+            </Button>
+            <Button x:Name="PinButton" Grid.Column="2" Style="{StaticResource ModuleIconButtonStyle}"
+                    Click="OnPinClick" ToolTipService.ToolTip="Поверх всех окон">
+                <FontIcon x:Name="PinIcon" Glyph="&#xE718;" FontSize="14" />
+            </Button>
+            <Button Grid.Column="3" Style="{StaticResource ModuleIconButtonStyle}"
+                    Click="OnSettingsClick" ToolTipService.ToolTip="Настройки">
+                <FontIcon Glyph="&#xE713;" FontSize="14" />
+            </Button>
+        </Grid>
+
+        <!-- Глобальный поиск -->
+        <AutoSuggestBox x:Name="SearchBox" Grid.Row="1" QueryIcon="Find"
+                        PlaceholderText="Поиск: задачи, заметки, события…"
+                        TextChanged="OnSearchTextChanged" />
+
+        <!-- Модули: перетаскивание меняет порядок -->
+        <ListView x:Name="ModulesList" Grid.Row="2"
+                  SelectionMode="None"
+                  CanReorderItems="True" CanDragItems="True" AllowDrop="True"
+                  ScrollViewer.VerticalScrollBarVisibility="Hidden">
+            <ListView.ItemContainerStyle>
+                <Style TargetType="ListViewItem">
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                    <Setter Property="Padding" Value="0" />
+                    <Setter Property="MinHeight" Value="0" />
+                    <Setter Property="Margin" Value="0,0,0,8" />
+                </Style>
+            </ListView.ItemContainerStyle>
+            <ListView.ItemTemplate>
+                <DataTemplate>
+                    <controls:ModuleHost />
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+    </Grid>
+</Window>

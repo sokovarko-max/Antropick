@@ -1,0 +1,19 @@
+<UserControl
+    x:Class="DashboardPro.App.Modules.ProjectsModule"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <StackPanel Spacing="6">
+        <StackPanel x:Name="ListPanel" Spacing="10" />
+        <Grid ColumnSpacing="6">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBox x:Name="NewProjectBox" PlaceholderText="Новый проект…" KeyDown="OnNewProjectKeyDown" />
+            <Button Grid.Column="1" Click="OnAddClick" ToolTipService.ToolTip="Добавить проект">
+                <FontIcon Glyph="&#xE710;" FontSize="12" />
+            </Button>
+        </Grid>
+    </StackPanel>
+</UserControl>
