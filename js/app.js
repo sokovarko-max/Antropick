@@ -51,6 +51,7 @@ function defaultState() {
     workouts: [],   // {id, date, start, end, entries:[{exId, sets:[{w, r, done}]}]}
     active: null,   // текущая тренировка
     weights: [],    // {date, kg}
+    programs: [],   // свои программы: {id, name, days:[{name, items:[[exName, sets, reps]]}]}
     settings: { restSec: 90 },
   };
 }
@@ -160,7 +161,7 @@ function beep() {
 
 /* ---------- Навигация ---------- */
 
-const PAGES = ['workout', 'history', 'exercises', 'progress'];
+const PAGES = ['workout', 'programs', 'history', 'progress', 'more'];
 let currentPage = 'workout';
 
 $$('.tab').forEach(tab => {
@@ -176,9 +177,16 @@ function showPage(name) {
 
 function render() {
   if (currentPage === 'workout') renderWorkout();
+  if (currentPage === 'programs') renderPrograms();
   if (currentPage === 'history') renderHistory();
-  if (currentPage === 'exercises') renderExercises();
   if (currentPage === 'progress') renderProgress();
+  if (currentPage === 'more') renderMore();
+}
+
+/* Ссылка на видеоинструкцию: поиск техники упражнения на YouTube */
+function videoUrl(name) {
+  const clean = name.replace(/\s*\(.+?\)\s*/g, ' ').trim();
+  return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(clean + ' техника выполнения');
 }
 
 /* ---------- Модальные окна ---------- */
@@ -302,13 +310,17 @@ function entryCard(entry, idx) {
   const prevStr = prev.length
     ? 'Прошлый раз: ' + prev.map(s => `${s.w}×${s.r}`).join(', ')
     : 'Первое выполнение';
+  const targetStr = entry.target ? `Цель: ${entry.target} · ` : '';
 
   card.innerHTML = `
     <div class="ex-title">
       <span>${esc(ex ? ex.name : '?')}</span>
-      <button class="icon-btn" data-del>✕</button>
+      <span style="white-space:nowrap">
+        <button class="icon-btn" data-video title="Видео техники">▶</button>
+        <button class="icon-btn" data-del>✕</button>
+      </span>
     </div>
-    <div class="ex-prev">${esc(prevStr)}</div>
+    <div class="ex-prev">${esc(targetStr + prevStr)}</div>
     <div class="set-head"><span>#</span><span>Вес, кг</span><span>Повторы</span><span></span></div>
     ${entry.sets.map((s, i) => `
       <div class="set-row" data-set="${i}">
@@ -322,6 +334,10 @@ function entryCard(entry, idx) {
       <button class="btn-chip" data-rm-set>− Подход</button>
     </div>
   `;
+
+  card.querySelector('[data-video]').addEventListener('click', () => {
+    if (ex) window.open(videoUrl(ex.name), '_blank');
+  });
 
   card.querySelector('[data-del]').addEventListener('click', () => {
     if (confirm('Убрать упражнение из тренировки?')) {
@@ -463,12 +479,17 @@ function openExercisePicker(onPick) {
       if (!groups.has(g)) continue;
       html += `<div class="group-title">${esc(g)}</div>`;
       html += groups.get(g)
-        .map(ex => `<div class="ex-item" data-id="${ex.id}"><span>${esc(ex.name)}</span></div>`)
+        .map(ex => `<div class="ex-item" data-id="${ex.id}"><span>${esc(ex.name)}</span><button class="icon-btn" data-video title="Видео техники">▶</button></div>`)
         .join('');
     }
     listEl.innerHTML = html || '<div class="empty-state">Ничего не найдено</div>';
     $$('.ex-item', listEl).forEach(item => {
-      item.addEventListener('click', () => {
+      item.addEventListener('click', e => {
+        const ex = exById(item.dataset.id);
+        if (e.target.closest('[data-video]')) {
+          if (ex) window.open(videoUrl(ex.name), '_blank');
+          return;
+        }
         closeModal();
         onPick(item.dataset.id);
       });
@@ -566,20 +587,23 @@ function workoutDetailHtml(w) {
   }).join('');
 }
 
-/* ---------- Экран «Упражнения» ---------- */
+/* ---------- Библиотека упражнений (модальное окно) ---------- */
 
-function renderExercises() {
-  const page = $('#page-exercises');
-  page.innerHTML = `
-    <h1>Упражнения</h1>
-    <div class="search-row">
-      <input type="text" placeholder="Поиск…" id="ex-search">
-      <button class="btn-chip accent" id="ex-new">+ Новое</button>
+function openExerciseLibrary() {
+  const modal = openModal(`
+    <div class="modal-head">
+      <h2>Упражнения</h2>
+      <button class="icon-btn" data-close>✕</button>
     </div>
-    <div id="ex-list"></div>
-  `;
+    <div class="search-row">
+      <input type="text" placeholder="Поиск…" data-search>
+      <button class="btn-chip accent" data-new>+ Новое</button>
+    </div>
+    <div class="modal-body" data-list></div>
+  `);
 
-  const listEl = $('#ex-list');
+  const listEl = $('[data-list]', modal);
+  const searchEl = $('[data-search]', modal);
 
   function draw(filter = '') {
     const f = filter.trim().toLowerCase();
@@ -596,33 +620,49 @@ function renderExercises() {
       html += groups.get(g).map(ex => {
         const n = state.workouts.filter(w => w.entries.some(en => en.exId === ex.id)).length;
         return `<div class="ex-item" data-id="${ex.id}">
-          <span>${esc(ex.name)}</span>
-          <span class="sub">${n ? n + '×' : ''}${ex.custom ? ' 🗑' : ''}</span>
+          <span>${esc(ex.name)}<span class="sub">${n ? ' · ' + n + ' трен.' : ''}</span></span>
+          <span style="white-space:nowrap">
+            <button class="icon-btn" data-video title="Видео техники">▶</button>
+            ${ex.custom ? '<button class="icon-btn" data-del>🗑</button>' : ''}
+          </span>
         </div>`;
       }).join('');
     }
     listEl.innerHTML = html || '<div class="empty-state">Ничего не найдено</div>';
 
     $$('.ex-item', listEl).forEach(item => {
-      item.addEventListener('click', () => {
+      item.addEventListener('click', e => {
         const ex = exById(item.dataset.id);
         if (!ex) return;
-        if (ex.custom && confirm(`Удалить «${ex.name}»? История по нему останется без названия.`)) {
-          state.exercises = state.exercises.filter(e => e.id !== ex.id);
-          save();
-          draw($('#ex-search').value);
-        } else if (!ex.custom) {
+        if (e.target.closest('[data-video]')) {
+          window.open(videoUrl(ex.name), '_blank');
+          return;
+        }
+        if (e.target.closest('[data-del]')) {
+          if (confirm(`Удалить «${ex.name}»?`)) {
+            state.exercises = state.exercises.filter(x => x.id !== ex.id);
+            save();
+            draw(searchEl.value);
+          }
+          return;
+        }
+        // переход к графику прогресса по упражнению
+        const used = state.workouts.some(w => w.entries.some(en => en.exId === ex.id));
+        if (used) {
+          closeModal();
+          progressExId = ex.id;
           showPage('progress');
-          const sel = $('#progress-ex');
-          if (sel) { sel.value = ex.id; sel.dispatchEvent(new Event('change')); }
+        } else {
+          window.open(videoUrl(ex.name), '_blank');
         }
       });
     });
   }
 
   draw();
-  $('#ex-search').addEventListener('input', e => draw(e.target.value));
-  $('#ex-new').addEventListener('click', () => openNewExercise(null));
+  searchEl.addEventListener('input', () => draw(searchEl.value));
+  $('[data-close]', modal).addEventListener('click', closeModal);
+  $('[data-new]', modal).addEventListener('click', () => openNewExercise(() => openExerciseLibrary()));
 }
 
 /* ---------- Экран «Прогресс» ---------- */
@@ -674,19 +714,6 @@ function renderProgress() {
       </div>
       <div class="chart-wrap" id="bw-chart"></div>
     </div>
-
-    <h2>Настройки</h2>
-    <div class="card">
-      <div class="form-row" style="margin-bottom:12px">
-        <label class="sub" style="display:block;margin-bottom:6px">Отдых между подходами: <b id="rest-val">${state.settings.restSec}</b> сек</label>
-        <input type="range" min="30" max="300" step="15" value="${state.settings.restSec}" id="rest-range" style="width:100%">
-      </div>
-      <div class="settings-row">
-        <button class="btn secondary" id="export">Экспорт данных</button>
-        <button class="btn secondary" id="import">Импорт</button>
-      </div>
-      <input type="file" id="import-file" accept=".json" style="display:none">
-    </div>
   `;
 
   // График упражнения
@@ -712,16 +739,6 @@ function renderProgress() {
     toast('Вес записан');
     renderProgress();
   });
-
-  $('#rest-range').addEventListener('input', e => {
-    state.settings.restSec = +e.target.value;
-    $('#rest-val').textContent = e.target.value;
-    save();
-  });
-
-  $('#export').addEventListener('click', exportData);
-  $('#import').addEventListener('click', () => $('#import-file').click());
-  $('#import-file').addEventListener('change', importData);
 }
 
 function drawExerciseChart() {
@@ -827,6 +844,463 @@ function attachChartTooltip(container) {
     tipText.setAttribute('text-anchor', 'middle');
     tip.style.display = '';
   });
+}
+
+/* ---------- Экран «Программы» ---------- */
+
+let programFilter = 'м';
+
+function renderPrograms() {
+  const page = $('#page-programs');
+  page.innerHTML = `
+    <h1>Программы</h1>
+    <div class="filter-row">
+      <button class="btn-chip ${programFilter === 'м' ? 'accent' : ''}" data-f="м">Мужские</button>
+      <button class="btn-chip ${programFilter === 'ж' ? 'accent' : ''}" data-f="ж">Женские</button>
+      <button class="btn-chip ${programFilter === 'мои' ? 'accent' : ''}" data-f="мои">Мои</button>
+    </div>
+    <div id="program-list"></div>
+  `;
+
+  $$('.filter-row .btn-chip', page).forEach(b => {
+    b.addEventListener('click', () => {
+      programFilter = b.dataset.f;
+      renderPrograms();
+    });
+  });
+
+  const listEl = $('#program-list');
+
+  if (programFilter === 'мои') {
+    listEl.innerHTML = `
+      <button class="btn" id="new-program" style="margin-bottom:12px">+ Создать программу</button>
+      ${state.programs.length ? '' : `<div class="empty-state"><div class="big">📝</div><p>Собери свою программу из любых<br>упражнений — и запускай тренировки в один тап.</p></div>`}
+      ${state.programs.map(p => programCardHtml(p, true)).join('')}
+    `;
+    $('#new-program').addEventListener('click', () => openProgramBuilder(null));
+  } else {
+    const progs = PROGRAMS.filter(p => p.gender === programFilter);
+    listEl.innerHTML = progs.map(p => programCardHtml(p, false)).join('');
+  }
+
+  $$('.prog-card', listEl).forEach(card => {
+    card.addEventListener('click', () => {
+      const custom = card.dataset.custom === '1';
+      const prog = custom
+        ? state.programs.find(p => p.id === card.dataset.id)
+        : PROGRAMS.find(p => p.id === card.dataset.id);
+      if (prog) openProgramDetail(prog, custom);
+    });
+  });
+}
+
+function programCardHtml(p, custom) {
+  return `
+    <div class="card prog-card" data-id="${p.id}" data-custom="${custom ? 1 : 0}">
+      <div class="hist-date">${esc(p.name)}</div>
+      <div class="hist-meta">
+        <span>📅 ${p.days.length} ${dayWord(p.days.length)}</span>
+        ${p.level ? `<span>⚡ ${esc(p.level)}</span>` : ''}
+      </div>
+      ${p.desc ? `<div class="sub" style="margin-top:6px">${esc(p.desc)}</div>` : ''}
+    </div>`;
+}
+
+function dayWord(n) {
+  if (n === 1) return 'день';
+  if (n >= 2 && n <= 4) return 'дня';
+  return 'дней';
+}
+
+function openProgramDetail(prog, custom) {
+  const modal = openModal(`
+    <div class="modal-head">
+      <h2>${esc(prog.name)}</h2>
+      <button class="icon-btn" data-close>✕</button>
+    </div>
+    <div class="modal-body">
+      ${prog.desc ? `<p class="sub" style="margin-bottom:12px">${esc(prog.desc)}</p>` : ''}
+      ${prog.days.map((d, di) => `
+        <div class="card">
+          <div class="ex-title"><span>${esc(d.name)}</span></div>
+          ${d.items.map(([name, sets, reps]) => `
+            <div class="prog-ex-row">
+              <span>${esc(name)}</span>
+              <span style="white-space:nowrap"><b>${sets}×${esc(String(reps))}</b>
+                <button class="icon-btn" data-video="${esc(name)}" title="Видео техники">▶</button>
+              </span>
+            </div>`).join('')}
+          <button class="btn" data-start="${di}" style="margin-top:10px;padding:12px;font-size:15px">Начать эту тренировку</button>
+        </div>`).join('')}
+      ${custom ? `
+        <div class="settings-row" style="margin-top:4px">
+          <button class="btn secondary" data-edit>Изменить</button>
+          <button class="btn danger-outline" data-delete>Удалить</button>
+        </div>` : ''}
+    </div>
+  `);
+
+  $('[data-close]', modal).addEventListener('click', closeModal);
+
+  $$('[data-video]', modal).forEach(b => {
+    b.addEventListener('click', () => window.open(videoUrl(b.dataset.video), '_blank'));
+  });
+
+  $$('[data-start]', modal).forEach(b => {
+    b.addEventListener('click', () => {
+      const day = prog.days[+b.dataset.start];
+      if (state.active && !confirm('Уже идёт тренировка. Начать новую вместо неё?')) return;
+      startWorkoutFromDay(day);
+      closeModal();
+    });
+  });
+
+  if (custom) {
+    $('[data-edit]', modal).addEventListener('click', () => openProgramBuilder(prog));
+    $('[data-delete]', modal).addEventListener('click', () => {
+      if (confirm(`Удалить программу «${prog.name}»?`)) {
+        state.programs = state.programs.filter(p => p.id !== prog.id);
+        save();
+        closeModal();
+        renderPrograms();
+      }
+    });
+  }
+}
+
+function exIdByName(name) {
+  let ex = state.exercises.find(e => e.name === name);
+  if (!ex) {
+    ex = { id: uid(), name, group: 'Другое', custom: true };
+    state.exercises.push(ex);
+  }
+  return ex.id;
+}
+
+function startWorkoutFromDay(day) {
+  const entries = day.items.map(([name, sets, reps]) => {
+    const exId = exIdByName(name);
+    const prev = lastSetsFor(exId);
+    const repNum = parseInt(String(reps), 10) || 0;
+    const setArr = [];
+    for (let i = 0; i < sets; i++) {
+      const p = prev[i] || prev[prev.length - 1];
+      setArr.push({ w: p ? p.w : 0, r: p ? p.r : repNum, done: false });
+    }
+    return { exId, sets: setArr, target: `${sets}×${reps}` };
+  });
+  state.active = { start: Date.now(), entries };
+  save();
+  showPage('workout');
+  toast('Тренировка по программе начата');
+}
+
+/* ---- Конструктор своей программы ---- */
+
+let programDraft = null;
+
+function openProgramBuilder(prog) {
+  if (prog) {
+    // редактирование: глубокая копия
+    programDraft = JSON.parse(JSON.stringify(prog));
+  } else if (!programDraft) {
+    programDraft = { id: uid(), name: '', days: [{ name: 'День 1', items: [] }] };
+  }
+  drawProgramBuilder();
+}
+
+function drawProgramBuilder() {
+  const d = programDraft;
+  const modal = openModal(`
+    <div class="modal-head">
+      <h2>${state.programs.some(p => p.id === d.id) ? 'Изменить программу' : 'Новая программа'}</h2>
+      <button class="icon-btn" data-close>✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label>Название программы</label>
+        <input type="text" data-name value="${esc(d.name)}" placeholder="Например: Мой сплит">
+      </div>
+      ${d.days.map((day, di) => `
+        <div class="card" data-day="${di}">
+          <div class="ex-title">
+            <input type="text" data-day-name value="${esc(day.name)}" style="text-align:left;font-weight:700">
+            <button class="icon-btn" data-rm-day>✕</button>
+          </div>
+          ${day.items.map(([name, sets, reps], ii) => `
+            <div class="prog-ex-row" data-item="${ii}">
+              <span>${esc(name)}</span>
+              <span class="prog-ex-inputs">
+                <input type="number" inputmode="numeric" min="1" value="${sets}" data-sets> ×
+                <input type="text" inputmode="numeric" value="${esc(String(reps))}" data-reps>
+                <button class="icon-btn" data-rm-item>✕</button>
+              </span>
+            </div>`).join('')}
+          <button class="btn-chip" data-add-item style="margin-top:8px">+ Упражнение</button>
+        </div>`).join('')}
+      <button class="btn secondary" data-add-day style="margin-bottom:10px">+ Добавить день</button>
+      <button class="btn" data-save-prog>Сохранить программу</button>
+    </div>
+  `);
+
+  $('[data-close]', modal).addEventListener('click', () => { programDraft = null; closeModal(); });
+  $('[data-name]', modal).addEventListener('input', e => { d.name = e.target.value; });
+
+  $$('[data-day]', modal).forEach(dayEl => {
+    const di = +dayEl.dataset.day;
+    const day = d.days[di];
+    $('[data-day-name]', dayEl).addEventListener('input', e => { day.name = e.target.value; });
+    $('[data-rm-day]', dayEl).addEventListener('click', () => {
+      if (d.days.length <= 1) { toast('Нужен хотя бы один день'); return; }
+      d.days.splice(di, 1);
+      drawProgramBuilder();
+    });
+    $('[data-add-item]', dayEl).addEventListener('click', () => {
+      openExercisePicker(exId => {
+        const ex = exById(exId);
+        if (ex) day.items.push([ex.name, 3, '10']);
+        drawProgramBuilder();
+      });
+    });
+    $$('[data-item]', dayEl).forEach(itemEl => {
+      const ii = +itemEl.dataset.item;
+      $('[data-sets]', itemEl).addEventListener('input', e => { day.items[ii][1] = Math.max(1, parseInt(e.target.value, 10) || 1); });
+      $('[data-reps]', itemEl).addEventListener('input', e => { day.items[ii][2] = e.target.value; });
+      $('[data-rm-item]', itemEl).addEventListener('click', () => {
+        day.items.splice(ii, 1);
+        drawProgramBuilder();
+      });
+    });
+  });
+
+  $('[data-add-day]', modal).addEventListener('click', () => {
+    d.days.push({ name: 'День ' + (d.days.length + 1), items: [] });
+    drawProgramBuilder();
+  });
+
+  $('[data-save-prog]', modal).addEventListener('click', () => {
+    if (!d.name.trim()) { toast('Введи название программы'); return; }
+    if (!d.days.some(day => day.items.length)) { toast('Добавь хотя бы одно упражнение'); return; }
+    const idx = state.programs.findIndex(p => p.id === d.id);
+    if (idx >= 0) state.programs[idx] = d; else state.programs.push(d);
+    save();
+    programDraft = null;
+    programFilter = 'мои';
+    closeModal();
+    toast('Программа сохранена');
+    renderPrograms();
+  });
+}
+
+/* ---------- Экран «Ещё» ---------- */
+
+function renderMore() {
+  const page = $('#page-more');
+  page.innerHTML = `
+    <h1>Ещё</h1>
+    <div class="ex-item" id="more-ex"><span>🏋️ Упражнения<span class="sub"> · ${state.exercises.length} с видео</span></span><span class="sub">›</span></div>
+    <div class="ex-item" id="more-kbju"><span>🍎 Калькулятор КБЖУ</span><span class="sub">›</span></div>
+    <div class="ex-item" id="more-1rm"><span>💪 Калькулятор 1ПМ</span><span class="sub">›</span></div>
+    <div class="ex-item" id="more-kb"><span>📚 База знаний<span class="sub"> · ${ARTICLES.length} статей</span></span><span class="sub">›</span></div>
+    <div class="ex-item" id="more-settings"><span>⚙️ Настройки и резервная копия</span><span class="sub">›</span></div>
+  `;
+  $('#more-ex').addEventListener('click', openExerciseLibrary);
+  $('#more-kbju').addEventListener('click', openKbjuCalc);
+  $('#more-1rm').addEventListener('click', open1RmCalc);
+  $('#more-kb').addEventListener('click', openKnowledgeBase);
+  $('#more-settings').addEventListener('click', openSettings);
+}
+
+/* ---- Калькулятор КБЖУ (Миффлин — Сан-Жеор) ---- */
+
+function openKbjuCalc() {
+  const modal = openModal(`
+    <div class="modal-head">
+      <h2>Калькулятор КБЖУ</h2>
+      <button class="icon-btn" data-close>✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label>Пол</label>
+        <select data-sex><option value="m">Мужской</option><option value="f">Женский</option></select>
+      </div>
+      <div class="settings-row" style="margin-bottom:12px">
+        <div style="flex:1"><label class="sub" style="display:block;margin-bottom:6px">Возраст</label><input type="number" inputmode="numeric" data-age placeholder="25"></div>
+        <div style="flex:1"><label class="sub" style="display:block;margin-bottom:6px">Рост, см</label><input type="number" inputmode="numeric" data-height placeholder="175"></div>
+        <div style="flex:1"><label class="sub" style="display:block;margin-bottom:6px">Вес, кг</label><input type="number" inputmode="decimal" data-weight placeholder="70"></div>
+      </div>
+      <div class="form-row">
+        <label>Активность</label>
+        <select data-activity>
+          <option value="1.2">Сидячий образ жизни</option>
+          <option value="1.375">Тренировки 1–3 раза в неделю</option>
+          <option value="1.55" selected>Тренировки 3–5 раз в неделю</option>
+          <option value="1.725">Тренировки 6–7 раз в неделю</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>Цель</label>
+        <select data-goal>
+          <option value="-0.17">Похудение (−17%)</option>
+          <option value="0" selected>Поддержание веса</option>
+          <option value="0.12">Набор массы (+12%)</option>
+        </select>
+      </div>
+      <button class="btn" data-calc>Рассчитать</button>
+      <div data-result style="margin-top:14px"></div>
+    </div>
+  `);
+
+  $('[data-close]', modal).addEventListener('click', closeModal);
+
+  // подставим последний известный вес тела
+  const lastW = state.weights.length ? state.weights[state.weights.length - 1].kg : null;
+  if (lastW) $('[data-weight]', modal).value = lastW;
+
+  $('[data-calc]', modal).addEventListener('click', () => {
+    const sex = $('[data-sex]', modal).value;
+    const age = parseFloat($('[data-age]', modal).value);
+    const h = parseFloat($('[data-height]', modal).value);
+    const w = parseFloat($('[data-weight]', modal).value);
+    if (!age || !h || !w) { toast('Заполни возраст, рост и вес'); return; }
+
+    const bmr = 10 * w + 6.25 * h - 5 * age + (sex === 'm' ? 5 : -161);
+    const tdee = bmr * parseFloat($('[data-activity]', modal).value);
+    const goal = parseFloat($('[data-goal]', modal).value);
+    const kcal = Math.round(tdee * (1 + goal));
+
+    const protein = Math.round(w * (goal < 0 ? 2 : 1.8));
+    const fat = Math.round(w * 1);
+    const carbs = Math.max(0, Math.round((kcal - protein * 4 - fat * 9) / 4));
+
+    $('[data-result]', modal).innerHTML = `
+      <div class="stat-grid">
+        <div class="stat-tile"><div class="stat-value">${kcal.toLocaleString('ru-RU')}</div><div class="stat-label">ккал в день</div></div>
+        <div class="stat-tile"><div class="stat-value">${protein} г</div><div class="stat-label">белки</div></div>
+        <div class="stat-tile"><div class="stat-value">${fat} г</div><div class="stat-label">жиры</div></div>
+        <div class="stat-tile"><div class="stat-value">${carbs} г</div><div class="stat-label">углеводы</div></div>
+      </div>
+      <p class="sub">Расчёт по формуле Миффлина — Сан-Жеора. Это ориентир: следи за весом 2–3 недели и корректируй калории по факту.</p>
+    `;
+  });
+}
+
+/* ---- Калькулятор 1ПМ (формула Эпли) ---- */
+
+function open1RmCalc() {
+  const modal = openModal(`
+    <div class="modal-head">
+      <h2>Калькулятор 1ПМ</h2>
+      <button class="icon-btn" data-close>✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="sub" style="margin-bottom:12px">Введи вес и число повторов из тяжёлого рабочего подхода — получишь расчётный одноповторный максимум и проценты для программ.</p>
+      <div class="settings-row" style="margin-bottom:12px">
+        <div style="flex:1"><label class="sub" style="display:block;margin-bottom:6px">Вес, кг</label><input type="number" inputmode="decimal" data-w placeholder="80"></div>
+        <div style="flex:1"><label class="sub" style="display:block;margin-bottom:6px">Повторы</label><input type="number" inputmode="numeric" data-r placeholder="8"></div>
+      </div>
+      <button class="btn" data-calc>Рассчитать</button>
+      <div data-result style="margin-top:14px"></div>
+    </div>
+  `);
+
+  $('[data-close]', modal).addEventListener('click', closeModal);
+
+  $('[data-calc]', modal).addEventListener('click', () => {
+    const w = parseFloat($('[data-w]', modal).value);
+    const r = parseInt($('[data-r]', modal).value, 10);
+    if (!w || !r) { toast('Введи вес и повторы'); return; }
+    if (r > 12) { toast('Для точности используй подход до 12 повторов'); }
+
+    const orm = w * (1 + r / 30); // Эпли
+    const rows = [
+      [95, '1–2 повтора'], [90, '3–4 повтора'], [85, '5–6 повторов'],
+      [80, '7–8 повторов'], [75, '9–10 повторов'], [70, '10–12 повторов'],
+      [60, '15+ повторов'], [50, 'разминка'],
+    ];
+    $('[data-result]', modal).innerHTML = `
+      <div class="stat-tile" style="margin-bottom:12px">
+        <div class="stat-value">${(Math.round(orm * 2) / 2).toLocaleString('ru-RU')} кг</div>
+        <div class="stat-label">расчётный 1ПМ</div>
+      </div>
+      ${rows.map(([pct, use]) => `
+        <div class="prog-ex-row">
+          <span>${pct}% <span class="sub">· ${use}</span></span>
+          <b>${(Math.round(orm * pct / 100 * 2) / 2).toLocaleString('ru-RU')} кг</b>
+        </div>`).join('')}
+    `;
+  });
+}
+
+/* ---- База знаний ---- */
+
+function openKnowledgeBase() {
+  const modal = openModal(`
+    <div class="modal-head">
+      <h2>База знаний</h2>
+      <button class="icon-btn" data-close>✕</button>
+    </div>
+    <div class="modal-body">
+      ${ARTICLES.map(a => `<div class="ex-item" data-id="${a.id}"><span>${a.icon} ${esc(a.title)}</span><span class="sub">›</span></div>`).join('')}
+    </div>
+  `);
+  $('[data-close]', modal).addEventListener('click', closeModal);
+  $$('.ex-item', modal).forEach(item => {
+    item.addEventListener('click', () => {
+      const a = ARTICLES.find(x => x.id === item.dataset.id);
+      if (a) openArticle(a);
+    });
+  });
+}
+
+function openArticle(a) {
+  const modal = openModal(`
+    <div class="modal-head">
+      <h2>${a.icon} ${esc(a.title)}</h2>
+      <button class="icon-btn" data-close>✕</button>
+    </div>
+    <div class="modal-body article">
+      ${a.text.split('\n\n').map(p => `<p>${esc(p).replace(/\n/g, '<br>')}</p>`).join('')}
+      <button class="btn secondary" data-back style="margin-top:12px">← Ко всем статьям</button>
+    </div>
+  `);
+  $('[data-close]', modal).addEventListener('click', closeModal);
+  $('[data-back]', modal).addEventListener('click', openKnowledgeBase);
+}
+
+/* ---- Настройки ---- */
+
+function openSettings() {
+  const modal = openModal(`
+    <div class="modal-head">
+      <h2>Настройки</h2>
+      <button class="icon-btn" data-close>✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="card">
+        <label class="sub" style="display:block;margin-bottom:6px">Отдых между подходами: <b data-rest-val>${state.settings.restSec}</b> сек</label>
+        <input type="range" min="30" max="300" step="15" value="${state.settings.restSec}" data-rest-range style="width:100%">
+      </div>
+      <div class="card">
+        <p class="sub" style="margin-bottom:10px">Все данные хранятся только на этом телефоне. Сохраняй резервную копию, чтобы не потерять историю.</p>
+        <div class="settings-row">
+          <button class="btn secondary" data-export>Экспорт данных</button>
+          <button class="btn secondary" data-import>Импорт</button>
+        </div>
+        <input type="file" data-import-file accept=".json" style="display:none">
+      </div>
+    </div>
+  `);
+
+  $('[data-close]', modal).addEventListener('click', closeModal);
+  $('[data-rest-range]', modal).addEventListener('input', e => {
+    state.settings.restSec = +e.target.value;
+    $('[data-rest-val]', modal).textContent = e.target.value;
+    save();
+  });
+  $('[data-export]', modal).addEventListener('click', exportData);
+  $('[data-import]', modal).addEventListener('click', () => $('[data-import-file]', modal).click());
+  $('[data-import-file]', modal).addEventListener('change', importData);
 }
 
 /* ---------- Экспорт / импорт ---------- */

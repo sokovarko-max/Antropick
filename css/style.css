@@ -211,6 +211,30 @@ input::placeholder { color: var(--muted); font-weight: 400; }
 .ex-item:active { background: var(--surface-2); }
 .ex-item .sub { font-weight: 400; }
 
+/* ---- Программы ---- */
+.filter-row { display: flex; gap: 8px; margin-bottom: 14px; }
+.filter-row .btn-chip { flex: 1; text-align: center; }
+.filter-row .btn-chip.accent { color: #fff; }
+
+.prog-ex-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+.prog-ex-row:last-of-type { border-bottom: none; }
+.prog-ex-row .icon-btn { padding: 2px 6px; font-size: 14px; }
+
+.prog-ex-inputs { display: flex; align-items: center; gap: 4px; color: var(--muted); }
+.prog-ex-inputs input { width: 52px; padding: 8px 4px; font-size: 14px; }
+
+/* ---- База знаний ---- */
+.article p { margin-bottom: 12px; font-size: 15px; line-height: 1.55; color: var(--text-2); }
+.article p:first-child { color: var(--text); }
+
 /* ---- Прогресс ---- */
 .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 6px; }
 .stat-tile {
