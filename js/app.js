@@ -52,6 +52,7 @@ function defaultState() {
     active: null,   // текущая тренировка
     weights: [],    // {date, kg}
     programs: [],   // свои программы: {id, name, days:[{name, items:[[exName, sets, reps]]}]}
+    watch: [],      // тренировки с Apple Watch: {id, date, type, min, kcal}
     settings: { restSec: 90 },
   };
 }
@@ -623,24 +624,38 @@ const expanded = new Set();
 
 function renderHistory() {
   const page = $('#page-history');
-  if (!state.workouts.length) {
+  if (!state.workouts.length && !state.watch.length) {
     page.innerHTML = `<h1>История</h1>
       <div class="empty-state"><div class="big">📖</div><p>Здесь появятся твои тренировки.</p></div>`;
     return;
   }
 
-  page.innerHTML = `<h1>История</h1>` + state.workouts.map(w => `
-    <div class="card hist-card" data-id="${w.id}">
-      <div class="hist-date">${esc(fmtDate(w.date))}</div>
+  // объединяем тренировки в зале и тренировки с Apple Watch
+  const items = [
+    ...state.workouts.map(w => ({ kind: 'gym', date: w.date, w })),
+    ...state.watch.map(w => ({ kind: 'watch', date: w.date, w })),
+  ].sort((a, b) => b.date.localeCompare(a.date));
+
+  page.innerHTML = `<h1>История</h1>` + items.map(it => it.kind === 'watch' ? `
+    <div class="card hist-card" data-watch="${it.w.id}">
+      <div class="hist-date">⌚ ${esc(it.w.type)}</div>
       <div class="hist-meta">
-        <span>⏱ ${fmtDuration(w.end - w.start)}</span>
-        <span>🏋️ ${tonnage(w).toLocaleString('ru-RU')} кг</span>
-        <span>✅ ${setCount(w)} подходов</span>
+        <span>${esc(fmtDate(it.w.date))}</span>
+        ${it.w.min ? `<span>⏱ ${it.w.min} мин</span>` : ''}
+        ${it.w.kcal ? `<span>🔥 ${it.w.kcal} ккал</span>` : ''}
       </div>
-      ${expanded.has(w.id) ? `
+    </div>` : `
+    <div class="card hist-card" data-id="${it.w.id}">
+      <div class="hist-date">${esc(fmtDate(it.w.date))}</div>
+      <div class="hist-meta">
+        <span>⏱ ${fmtDuration(it.w.end - it.w.start)}</span>
+        <span>🏋️ ${tonnage(it.w).toLocaleString('ru-RU')} кг</span>
+        <span>✅ ${setCount(it.w)} подходов</span>
+      </div>
+      ${expanded.has(it.w.id) ? `
         <div class="hist-detail">
-          ${w.note ? `<div class="sub" style="margin-bottom:8px">📝 ${esc(w.note)}</div>` : ''}
-          ${workoutDetailHtml(w)}
+          ${it.w.note ? `<div class="sub" style="margin-bottom:8px">📝 ${esc(it.w.note)}</div>` : ''}
+          ${workoutDetailHtml(it.w)}
           <div class="settings-row" style="margin-top:8px">
             <button class="btn secondary" data-repeat style="padding:10px;font-size:14px">Повторить</button>
             <button class="btn danger-outline" data-del style="padding:10px;font-size:14px">Удалить</button>
@@ -648,7 +663,17 @@ function renderHistory() {
         </div>` : ''}
     </div>`).join('');
 
-  $$('.hist-card', page).forEach(card => {
+  $$('.hist-card[data-watch]', page).forEach(card => {
+    card.addEventListener('click', () => {
+      if (confirm('Удалить эту тренировку с часов из истории?')) {
+        state.watch = state.watch.filter(w => w.id !== card.dataset.watch);
+        save();
+        renderHistory();
+      }
+    });
+  });
+
+  $$('.hist-card[data-id]', page).forEach(card => {
     const id = card.dataset.id;
     card.addEventListener('click', e => {
       if (e.target.closest('[data-del]')) {
@@ -819,7 +844,8 @@ function renderProgress() {
       <div class="stat-tile"><div class="stat-value">${monthWorkouts.length}</div><div class="stat-label">в этом месяце</div></div>
       <div class="stat-tile"><div class="stat-value">${weekWorkouts.length}</div><div class="stat-label">за 7 дней</div></div>
       <div class="stat-tile"><div class="stat-value">${weekStreak()}</div><div class="stat-label">недель подряд</div></div>
-      <div class="stat-tile" style="grid-column:1/-1"><div class="stat-value">${(totalTonnage / 1000).toFixed(1)} т</div><div class="stat-label">поднято за всё время</div></div>
+      <div class="stat-tile" ${state.watch.length ? '' : 'style="grid-column:1/-1"'}><div class="stat-value">${(totalTonnage / 1000).toFixed(1)} т</div><div class="stat-label">поднято за всё время</div></div>
+      ${state.watch.length ? `<div class="stat-tile"><div class="stat-value">⌚ ${state.watch.length}</div><div class="stat-label">тренировок с часов</div></div>` : ''}
     </div>
 
     <h2>Прогресс упражнения</h2>
@@ -1309,6 +1335,7 @@ function renderMore() {
     <div class="ex-item" id="more-kbju"><span>🍎 Калькулятор КБЖУ</span><span class="sub">›</span></div>
     <div class="ex-item" id="more-1rm"><span>💪 Калькулятор 1ПМ</span><span class="sub">›</span></div>
     <div class="ex-item" id="more-plates"><span>⚖️ Блины на штангу</span><span class="sub">›</span></div>
+    <div class="ex-item" id="more-watch"><span>⌚ Импорт из Apple Watch<span class="sub">${state.watch.length ? ' · ' + state.watch.length : ''}</span></span><span class="sub">›</span></div>
     <div class="ex-item" id="more-kb"><span>📚 База знаний<span class="sub"> · ${ARTICLES.length} статей</span></span><span class="sub">›</span></div>
     <div class="ex-item" id="more-settings"><span>⚙️ Настройки и резервная копия</span><span class="sub">›</span></div>
   `;
@@ -1316,6 +1343,7 @@ function renderMore() {
   $('#more-kbju').addEventListener('click', openKbjuCalc);
   $('#more-1rm').addEventListener('click', open1RmCalc);
   $('#more-plates').addEventListener('click', openPlateCalc);
+  $('#more-watch').addEventListener('click', openWatchImport);
   $('#more-kb').addEventListener('click', openKnowledgeBase);
   $('#more-settings').addEventListener('click', openSettings);
 }
@@ -1489,6 +1517,155 @@ function openPlateCalc() {
         ? `Точно ${target} кг стандартными блинами не собрать. Ближайший вес: <b>${Math.round(achieved * 100) / 100} кг</b> (гриф ${bar} + блины).`
         : `Итого на штанге: <b>${target} кг</b> (гриф ${bar} кг + ${used.length ? used.map(p => p + '×2').join(' + ') : 'без блинов'}).`}</p>
     `;
+  });
+}
+
+/* ---- Импорт из Apple Watch (экспорт приложения «Здоровье») ---- */
+
+const WATCH_TYPES = {
+  Running: 'Бег', Walking: 'Ходьба', Cycling: 'Велосипед', Swimming: 'Плавание',
+  Elliptical: 'Эллипс', Rowing: 'Гребля', Hiking: 'Хайкинг', Yoga: 'Йога',
+  Pilates: 'Пилатес', StairClimbing: 'Лестница', JumpRope: 'Скакалка',
+  TraditionalStrengthTraining: 'Силовая тренировка',
+  FunctionalStrengthTraining: 'Функциональная тренировка',
+  HighIntensityIntervalTraining: 'ВИИТ', CrossTraining: 'Кросс-тренинг',
+  CoreTraining: 'Пресс и кор', Dance: 'Танцы', Boxing: 'Бокс',
+  MartialArts: 'Единоборства', Soccer: 'Футбол', Basketball: 'Баскетбол',
+  Tennis: 'Теннис', Badminton: 'Бадминтон', TableTennis: 'Настольный теннис',
+  Other: 'Тренировка',
+};
+
+function healthAttr(tag, name) {
+  const m = tag.match(new RegExp(name + '="([^"]*)"'));
+  return m ? m[1] : '';
+}
+
+// "2026-07-18 07:30:21 +0300" → Date
+function healthDate(s) {
+  const iso = s.trim().replace(' ', 'T').replace(' ', '').replace(/([+-]\d{2})(\d{2})$/, '$1:$2');
+  const d = new Date(iso);
+  return isNaN(d) ? null : d;
+}
+
+// Потоковый разбор export.xml: файл может быть в сотни МБ, читаем кусками
+async function parseHealthExport(file, progressCb) {
+  const CHUNK = 4 * 1024 * 1024, OVERLAP = 16 * 1024;
+  const workouts = new Map(); // ключ: startDate|type
+  const weights = new Map();  // ключ: YYYY-MM-DD
+
+  for (let pos = 0; pos < file.size; pos += CHUNK) {
+    const from = Math.max(0, pos - OVERLAP);
+    const text = await file.slice(from, pos + CHUNK).text();
+    if (progressCb) progressCb(Math.min(99, Math.round((pos + CHUNK) / file.size * 100)));
+
+    for (const m of text.matchAll(/<Workout\b[^>]*>/g)) {
+      const tag = m[0];
+      const actRaw = healthAttr(tag, 'workoutActivityType').replace('HKWorkoutActivityType', '');
+      const start = healthDate(healthAttr(tag, 'startDate'));
+      if (!actRaw || !start) continue;
+      const key = start.getTime() + '|' + actRaw;
+      if (workouts.has(key)) continue;
+
+      let min = Math.round(parseFloat(healthAttr(tag, 'duration')) || 0);
+      const unit = healthAttr(tag, 'durationUnit');
+      if (unit === 'sec') min = Math.round(min / 60);
+
+      // калории: старый формат — атрибут, новый — вложенная статистика рядом
+      let kcal = Math.round(parseFloat(healthAttr(tag, 'totalEnergyBurned')) || 0);
+      if (!kcal) {
+        const after = text.slice(m.index, m.index + 4000);
+        const em = after.match(/HKQuantityTypeIdentifierActiveEnergyBurned"[^>]*sum="([0-9.]+)"/);
+        if (em) kcal = Math.round(parseFloat(em[1]));
+      }
+
+      workouts.set(key, {
+        id: 'aw' + start.getTime() + actRaw.length,
+        date: start.toISOString(),
+        type: WATCH_TYPES[actRaw] || actRaw,
+        min, kcal,
+      });
+    }
+
+    for (const m of text.matchAll(/<Record\b[^>]*HKQuantityTypeIdentifierBodyMass[^>]*>/g)) {
+      const tag = m[0];
+      const d = healthDate(healthAttr(tag, 'startDate'));
+      let kg = parseFloat(healthAttr(tag, 'value'));
+      if (!d || !kg) continue;
+      if (/lb/i.test(healthAttr(tag, 'unit'))) kg *= 0.4536;
+      weights.set(d.toISOString().slice(0, 10), Math.round(kg * 10) / 10);
+    }
+  }
+
+  return { workouts: [...workouts.values()], weights };
+}
+
+function openWatchImport() {
+  const modal = openModal(`
+    <div class="modal-head">
+      <h2>⌚ Импорт из Apple Watch</h2>
+      <button class="icon-btn" data-close>✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="sub" style="margin-bottom:10px">Apple не даёт веб-приложениям прямой доступ к «Здоровью», но все данные можно перенести файлом за минуту:</p>
+      <div class="card article">
+        <p>1. Открой приложение <b>Здоровье</b> → нажми на свой аватар → <b>Экспорт медданных</b>.</p>
+        <p>2. Сохрани архив в <b>Файлы</b> и нажми на него — он распакуется в папку.</p>
+        <p>3. Вернись сюда и выбери файл <b>export.xml</b> из этой папки.</p>
+      </div>
+      <button class="btn" data-pick>Выбрать export.xml</button>
+      <input type="file" data-file accept=".xml,text/xml" style="display:none">
+      <div data-status class="sub" style="margin-top:12px"></div>
+      ${state.watch.length ? `
+        <div class="card" style="margin-top:12px">
+          <p class="sub" style="margin-bottom:10px">Импортировано тренировок с часов: <b>${state.watch.length}</b></p>
+          <button class="btn danger-outline" data-clear style="padding:10px;font-size:14px">Удалить импортированные</button>
+        </div>` : ''}
+    </div>
+  `);
+
+  $('[data-close]', modal).addEventListener('click', closeModal);
+  $('[data-pick]', modal).addEventListener('click', () => $('[data-file]', modal).click());
+
+  const clearBtn = $('[data-clear]', modal);
+  if (clearBtn) clearBtn.addEventListener('click', () => {
+    if (confirm('Удалить все тренировки, импортированные с часов?')) {
+      state.watch = [];
+      save();
+      closeModal();
+      toast('Импорт с часов удалён');
+      render();
+    }
+  });
+
+  $('[data-file]', modal).addEventListener('change', async e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const status = $('[data-status]', modal);
+    status.textContent = 'Читаю файл…';
+    try {
+      const { workouts, weights } = await parseHealthExport(file, p => {
+        status.textContent = `Читаю файл… ${p}%`;
+      });
+
+      const known = new Set(state.watch.map(w => w.id));
+      const fresh = workouts.filter(w => !known.has(w.id));
+      state.watch.push(...fresh);
+      state.watch.sort((a, b) => b.date.localeCompare(a.date));
+
+      let freshW = 0;
+      for (const [date, kg] of weights) {
+        const ex = state.weights.find(x => x.date === date);
+        if (!ex) { state.weights.push({ date, kg }); freshW++; }
+      }
+      state.weights.sort((a, b) => a.date.localeCompare(b.date));
+
+      save();
+      status.innerHTML = `Готово: <b>${fresh.length}</b> новых тренировок с часов, <b>${freshW}</b> замеров веса. Смотри вкладку «История».`;
+      toast('Данные с Apple Watch импортированы ⌚');
+    } catch (err) {
+      status.textContent = 'Не удалось разобрать файл. Убедись, что выбран export.xml из экспорта «Здоровья».';
+    }
+    e.target.value = '';
   });
 }
 
