@@ -53,7 +53,10 @@ function defaultState() {
     weights: [],    // {date, kg}
     programs: [],   // свои программы: {id, name, days:[{name, items:[[exName, sets, reps]]}]}
     watch: [],      // тренировки с Apple Watch: {id, date, type, min, kcal}
-    settings: { restSec: 90 },
+    settings: {
+      restSec: 90,
+      ai: { provider: 'openrouter', key: '', model: '' }, // ключ пользователя, хранится только на телефоне
+    },
   };
 }
 
@@ -64,7 +67,12 @@ function load() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const s = JSON.parse(raw);
-      if (s && Array.isArray(s.exercises)) return Object.assign(defaultState(), s);
+      if (s && Array.isArray(s.exercises)) {
+        const st = Object.assign(defaultState(), s);
+        st.settings = Object.assign(defaultState().settings, st.settings);
+        if (!st.settings.ai) st.settings.ai = { provider: 'openrouter', key: '', model: '' };
+        return st;
+      }
     }
   } catch (e) { /* повреждённые данные — начинаем заново */ }
   return defaultState();
@@ -1336,6 +1344,7 @@ function renderMore() {
     <div class="ex-item" id="more-1rm"><span>💪 Калькулятор 1ПМ</span><span class="sub">›</span></div>
     <div class="ex-item" id="more-plates"><span>⚖️ Блины на штангу</span><span class="sub">›</span></div>
     <div class="ex-item" id="more-watch"><span>⌚ Импорт из Apple Watch<span class="sub">${state.watch.length ? ' · ' + state.watch.length : ''}</span></span><span class="sub">›</span></div>
+    <div class="ex-item" id="more-ai"><span>🤖 ИИ-тренер<span class="sub">${state.settings.ai && state.settings.ai.key ? ' · подключён' : ' · бесплатно'}</span></span><span class="sub">›</span></div>
     <div class="ex-item" id="more-kb"><span>📚 База знаний<span class="sub"> · ${ARTICLES.length} статей</span></span><span class="sub">›</span></div>
     <div class="ex-item" id="more-settings"><span>⚙️ Настройки и резервная копия</span><span class="sub">›</span></div>
   `;
@@ -1344,6 +1353,7 @@ function renderMore() {
   $('#more-1rm').addEventListener('click', open1RmCalc);
   $('#more-plates').addEventListener('click', openPlateCalc);
   $('#more-watch').addEventListener('click', openWatchImport);
+  $('#more-ai').addEventListener('click', openAiCoach);
   $('#more-kb').addEventListener('click', openKnowledgeBase);
   $('#more-settings').addEventListener('click', openSettings);
 }
@@ -1517,6 +1527,208 @@ function openPlateCalc() {
         ? `Точно ${target} кг стандартными блинами не собрать. Ближайший вес: <b>${Math.round(achieved * 100) / 100} кг</b> (гриф ${bar} + блины).`
         : `Итого на штанге: <b>${target} кг</b> (гриф ${bar} кг + ${used.length ? used.map(p => p + '×2').join(' + ') : 'без блинов'}).`}</p>
     `;
+  });
+}
+
+/* ---- ИИ-тренер (бесплатные модели через ключ пользователя) ---- */
+
+let aiChat = []; // история диалога в рамках сессии: {role: 'user'|'assistant', text}
+
+// Сводка данных пользователя для контекста ИИ
+function aiContext() {
+  const lines = ['Данные из дневника тренировок пользователя:'];
+
+  const recent = state.workouts.slice(0, 5);
+  if (recent.length) {
+    lines.push('Последние тренировки в зале:');
+    for (const w of recent) {
+      const exs = w.entries.map(en => {
+        const ex = exById(en.exId);
+        const top = en.sets.filter(s => s.done).sort((a, b) => b.w - a.w)[0];
+        return `${ex ? ex.name : '?'} ${top ? top.w + 'кг×' + top.r : ''}`;
+      }).join(', ');
+      lines.push(`- ${fmtShortDate(w.date)}: ${exs}${w.note ? ' (заметка: ' + w.note + ')' : ''}`);
+    }
+  } else {
+    lines.push('Тренировок в зале пока не записано.');
+  }
+
+  const usedIds = [...new Set(state.workouts.flatMap(w => w.entries.map(en => en.exId)))].slice(0, 8);
+  if (usedIds.length) {
+    lines.push('Рекорды: ' + usedIds.map(id => {
+      const ex = exById(id);
+      const r = bestEver(id);
+      return `${ex ? ex.name : '?'} ${r.w}кг`;
+    }).join(', '));
+  }
+
+  if (state.weights.length) {
+    const last = state.weights[state.weights.length - 1];
+    lines.push(`Вес тела: ${last.kg} кг (${last.date}).`);
+  }
+  if (state.watch.length) {
+    lines.push(`Кардио с Apple Watch за всё время: ${state.watch.length} тренировок.`);
+  }
+  lines.push(`Серия: ${weekStreak()} недель подряд с тренировками.`);
+  return lines.join('\n');
+}
+
+const AI_SYSTEM = 'Ты — дружелюбный персональный тренер в приложении «Мой Зал». Отвечай по-русски, кратко и по делу, без markdown-разметки. Давай практичные советы по тренировкам, прогрессии нагрузок, технике и питанию с учётом данных дневника пользователя. Ты не врач: при боли или травме советуй обратиться к специалисту.';
+
+async function askAi(userText) {
+  const ai = state.settings.ai;
+  const sys = AI_SYSTEM + '\n\n' + aiContext();
+  const history = aiChat.slice(-10);
+
+  if (ai.provider === 'gemini') {
+    const model = ai.model || 'gemini-2.5-flash';
+    const contents = history.map(m => ({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.text }] }));
+    contents.push({ role: 'user', parts: [{ text: userText }] });
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(ai.key)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ system_instruction: { parts: [{ text: sys }] }, contents }),
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status + ': ' + (await res.text()).slice(0, 200));
+    const data = await res.json();
+    const text = data.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '';
+    if (!text) throw new Error('Пустой ответ модели');
+    return text;
+  }
+
+  // OpenRouter (OpenAI-совместимый API)
+  const model = ai.model || 'openrouter/free';
+  const messages = [{ role: 'system', content: sys }];
+  for (const m of history) messages.push({ role: m.role, content: m.text });
+  messages.push({ role: 'user', content: userText });
+  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + ai.key,
+      'HTTP-Referer': location.origin,
+      'X-Title': 'Moy Zal',
+    },
+    body: JSON.stringify({ model, messages }),
+  });
+  if (!res.ok) throw new Error('HTTP ' + res.status + ': ' + (await res.text()).slice(0, 200));
+  const data = await res.json();
+  const text = data.choices?.[0]?.message?.content || '';
+  if (!text) throw new Error('Пустой ответ модели');
+  return text;
+}
+
+function openAiCoach() {
+  if (!state.settings.ai.key) { openAiSettings(); return; }
+
+  const modal = openModal(`
+    <div class="modal-head">
+      <h2>🤖 ИИ-тренер</h2>
+      <span>
+        <button class="icon-btn" data-settings>⚙️</button>
+        <button class="icon-btn" data-close>✕</button>
+      </span>
+    </div>
+    <div class="modal-body ai-chat" data-chat>
+      ${aiChat.length ? '' : `<p class="sub" style="margin-bottom:10px">ИИ видит твои последние тренировки, рекорды и вес — спрашивай о своём прогрессе. Быстрые вопросы:</p>
+      <div class="ai-quick">
+        <button class="btn-chip" data-q="Составь мне тренировку на завтра с учётом моих последних тренировок">Тренировка на завтра</button>
+        <button class="btn-chip" data-q="Проанализируй мой прогресс и скажи, что улучшить">Анализ прогресса</button>
+        <button class="btn-chip" data-q="Застрял в рабочих весах, как пробить плато?">Как пробить плато</button>
+        <button class="btn-chip" data-q="Что поесть до и после тренировки?">Питание вокруг тренировки</button>
+      </div>`}
+    </div>
+    <div class="ai-input-row">
+      <input type="text" data-input placeholder="Спроси тренера…" style="text-align:left;font-weight:400">
+      <button class="btn" data-send style="width:auto;padding:12px 18px">➤</button>
+    </div>
+  `);
+
+  const chatEl = $('[data-chat]', modal);
+  const inputEl = $('[data-input]', modal);
+
+  function drawMessages() {
+    const msgs = aiChat.map(m =>
+      `<div class="ai-msg ${m.role}">${esc(m.text).replace(/\n/g, '<br>')}</div>`).join('');
+    chatEl.innerHTML = msgs || chatEl.innerHTML;
+    chatEl.scrollTop = chatEl.scrollHeight;
+  }
+  if (aiChat.length) drawMessages();
+
+  async function send(text) {
+    text = text.trim();
+    if (!text) return;
+    inputEl.value = '';
+    aiChat.push({ role: 'user', text });
+    drawMessages();
+    chatEl.insertAdjacentHTML('beforeend', '<div class="ai-msg assistant" data-typing>…</div>');
+    chatEl.scrollTop = chatEl.scrollHeight;
+    try {
+      const answer = await askAi(text);
+      aiChat.push({ role: 'assistant', text: answer });
+    } catch (err) {
+      aiChat.push({ role: 'assistant', text: 'Не получилось связаться с ИИ: ' + err.message + '\nПроверь ключ и интернет в ⚙️ настройках.' });
+    }
+    drawMessages();
+  }
+
+  $$('[data-q]', modal).forEach(b => b.addEventListener('click', () => send(b.dataset.q)));
+  $('[data-send]', modal).addEventListener('click', () => send(inputEl.value));
+  inputEl.addEventListener('keydown', e => { if (e.key === 'Enter') send(inputEl.value); });
+  $('[data-close]', modal).addEventListener('click', closeModal);
+  $('[data-settings]', modal).addEventListener('click', openAiSettings);
+}
+
+function openAiSettings() {
+  const ai = state.settings.ai;
+  const modal = openModal(`
+    <div class="modal-head">
+      <h2>🤖 Подключение ИИ</h2>
+      <button class="icon-btn" data-close>✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="card article">
+        <p>ИИ-тренер работает через <b>бесплатные</b> модели. Нужен свой ключ — он хранится только на этом телефоне:</p>
+        <p><b>OpenRouter</b> (рекомендую): зарегистрируйся на openrouter.ai (без карты) → Keys → Create Key. Бесплатные модели, до 50 запросов в день.</p>
+        <p><b>Google Gemini</b>: зайди на aistudio.google.com → Get API key. Бесплатный тариф до 1000+ запросов в день.</p>
+      </div>
+      <div class="form-row">
+        <label>Провайдер</label>
+        <select data-provider>
+          <option value="openrouter" ${ai.provider !== 'gemini' ? 'selected' : ''}>OpenRouter (бесплатные модели)</option>
+          <option value="gemini" ${ai.provider === 'gemini' ? 'selected' : ''}>Google Gemini (бесплатный тариф)</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>API-ключ</label>
+        <input type="password" data-key value="${esc(ai.key)}" placeholder="sk-or-… или AIza…">
+      </div>
+      <div class="form-row">
+        <label>Модель (можно оставить пустым)</label>
+        <input type="text" data-model value="${esc(ai.model)}" placeholder="openrouter/free или gemini-2.5-flash">
+      </div>
+      <button class="btn" data-save-ai>Сохранить и открыть чат</button>
+      ${ai.key ? '<button class="btn danger-outline" data-unlink style="margin-top:10px">Отключить ИИ</button>' : ''}
+    </div>
+  `);
+
+  $('[data-close]', modal).addEventListener('click', closeModal);
+  $('[data-save-ai]', modal).addEventListener('click', () => {
+    ai.provider = $('[data-provider]', modal).value;
+    ai.key = $('[data-key]', modal).value.trim();
+    ai.model = $('[data-model]', modal).value.trim();
+    save();
+    if (!ai.key) { toast('Вставь API-ключ'); return; }
+    renderMore();
+    openAiCoach();
+  });
+  const unlink = $('[data-unlink]', modal);
+  if (unlink) unlink.addEventListener('click', () => {
+    ai.key = ''; aiChat = [];
+    save();
+    renderMore();
+    closeModal();
+    toast('ИИ отключён');
   });
 }
 
