@@ -23,6 +23,8 @@ public sealed partial class SettingsWindow : Window
         var s = App.Settings.Current;
 
         WidthBox.Value = s.SidebarWidth;
+        MonitorBox.Value = s.MonitorIndex;
+        SelectByTag(EdgeBox, s.DockEdge);
         TopmostToggle.IsOn = s.AlwaysOnTop;
         ReserveToggle.IsOn = s.ReserveScreenSpace;
         AutostartToggle.IsOn = s.Autostart;
@@ -86,6 +88,8 @@ public sealed partial class SettingsWindow : Window
         var s = App.Settings.Current;
 
         s.SidebarWidth = (int)WidthBox.Value;
+        s.DockEdge = SelectedTag(EdgeBox);
+        s.MonitorIndex = (int)MonitorBox.Value;
         s.AlwaysOnTop = TopmostToggle.IsOn;
         s.ReserveScreenSpace = ReserveToggle.IsOn;
         s.Autostart = AutostartToggle.IsOn;

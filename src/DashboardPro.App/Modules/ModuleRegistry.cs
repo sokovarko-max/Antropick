@@ -11,7 +11,11 @@ public sealed record ModuleDescriptor(
     string Title,
     string Glyph,
     Func<ModuleConfig, UserControl> Factory,
-    IReadOnlyList<SettingField>? SettingsSchema = null);
+    IReadOnlyList<SettingField>? SettingsSchema = null)
+{
+    /// <summary>false — модуль не показывается на панели, пока пользователь не добавит его кнопкой «+».</summary>
+    public bool DefaultEnabled { get; init; } = true;
+}
 
 /// <summary>Контрол модуля может реагировать на изменение своих настроек.</summary>
 public interface IModuleControl
@@ -53,6 +57,21 @@ public static class ModuleRegistry
         {
             new SettingField("refreshMinutes", "Анализ каждые, мин", "10")
         }),
+        new("launcher", "Быстрый запуск", "\uE71D", c => new QuickLaunchModule(c), new[]
+        {
+            new SettingField("apps", "Пути к программам/папкам (через ;)", @"C:\Windows\notepad.exe;C:\Projects")
+        }) { DefaultEnabled = false },
+        new("timers", "Таймеры", "\uEC92", c => new TimersModule(c)) { DefaultEnabled = false },
+        new("rss", "Новости (RSS)", "\uE736", c => new RssModule(c), new[]
+        {
+            new SettingField("url", "URL RSS/Atom-ленты", "https://habr.com/ru/rss/news/"),
+            new SettingField("maxItems", "Максимум записей", "5"),
+            new SettingField("refreshMinutes", "Обновление, мин", "30")
+        }) { DefaultEnabled = false },
+        new("clipboard", "Буфер обмена", "\uE77F", c => new ClipboardModule(c), new[]
+        {
+            new SettingField("maxItems", "Размер истории", "10")
+        }) { DefaultEnabled = false },
     };
 
     public static ModuleDescriptor? Find(string id) => All.FirstOrDefault(m => m.Id == id);

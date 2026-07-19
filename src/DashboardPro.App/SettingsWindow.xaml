@@ -15,6 +15,19 @@
                 <NumberBox x:Name="WidthBox" Minimum="280" Maximum="700" SpinButtonPlacementMode="Compact" />
             </StackPanel>
 
+            <StackPanel Spacing="4">
+                <TextBlock Text="Край экрана" FontSize="12" />
+                <ComboBox x:Name="EdgeBox" MinWidth="200">
+                    <ComboBoxItem Content="Справа" Tag="Right" />
+                    <ComboBoxItem Content="Слева" Tag="Left" />
+                </ComboBox>
+            </StackPanel>
+
+            <StackPanel Spacing="4">
+                <TextBlock Text="Монитор (-1 — авто, 0 — первый)" FontSize="12" />
+                <NumberBox x:Name="MonitorBox" Minimum="-1" Maximum="8" SpinButtonPlacementMode="Compact" />
+            </StackPanel>
+
             <ToggleSwitch x:Name="TopmostToggle" Header="Поверх всех окон" />
             <ToggleSwitch x:Name="ReserveToggle" Header="Резервировать место на экране (AppBar)" />
             <ToggleSwitch x:Name="AutostartToggle" Header="Запускать при входе в Windows" />

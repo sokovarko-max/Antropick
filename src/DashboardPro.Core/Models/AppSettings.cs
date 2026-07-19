@@ -11,6 +11,10 @@ public sealed class ModuleConfig
 public sealed class AppSettings
 {
     public int SidebarWidth { get; set; } = 380;
+    /// <summary>Right | Left — к какому краю экрана прижата панель.</summary>
+    public string DockEdge { get; set; } = "Right";
+    /// <summary>Индекс монитора (0 — первый); -1 — автоматически, где находится окно.</summary>
+    public int MonitorIndex { get; set; } = -1;
     public bool AlwaysOnTop { get; set; } = true;
     /// <summary>Резервировать место на рабочем столе через Shell AppBar (окна не перекрываются панелью).</summary>
     public bool ReserveScreenSpace { get; set; }

@@ -31,7 +31,8 @@ public sealed partial class HabitsModule : UserControl
 
         foreach (var habit in habits)
         {
-            var days = App.Store.GetHabitDays(habit.Id, weekStart, today);
+            var days = App.Store.GetHabitDays(habit.Id, today.AddDays(-365), today);
+            var streak = CountStreak(days, today);
 
             var row = new Grid { ColumnSpacing = 8 };
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -73,6 +74,13 @@ public sealed partial class HabitsModule : UserControl
                     StrokeThickness = done ? 0 : 1
                 });
             }
+            if (streak >= 2)
+            {
+                var streakText = UiFactory.Secondary($"🔥{streak}", 11);
+                streakText.VerticalAlignment = VerticalAlignment.Center;
+                streakText.Margin = new Thickness(4, 0, 0, 0);
+                dots.Children.Add(streakText);
+            }
             Grid.SetColumn(dots, 2);
             row.Children.Add(dots);
 
@@ -83,6 +91,19 @@ public sealed partial class HabitsModule : UserControl
 
             ListPanel.Children.Add(row);
         }
+    }
+
+    /// <summary>Непрерывная серия дней подряд, заканчивающаяся сегодня или вчера.</summary>
+    private static int CountStreak(HashSet<DateOnly> days, DateOnly today)
+    {
+        var day = days.Contains(today) ? today : today.AddDays(-1);
+        var streak = 0;
+        while (days.Contains(day))
+        {
+            streak++;
+            day = day.AddDays(-1);
+        }
+        return streak;
     }
 
     private void OnAddClick(object sender, RoutedEventArgs e) => AddHabit();

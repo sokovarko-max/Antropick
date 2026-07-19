@@ -11,21 +11,26 @@ public static class WindowInterop
 
     public static double GetScale(IntPtr hwnd) => GetDpiForWindow(hwnd) / 96.0;
 
-    /// <summary>Прижимает окно к правому краю рабочей области монитора на всю высоту.</summary>
-    public static void DockRight(AppWindow appWindow, IntPtr hwnd, int widthDip)
+    /// <summary>Монитор для панели: по индексу из настроек либо тот, где сейчас окно (-1).</summary>
+    public static DisplayArea GetDisplayArea(AppWindow appWindow, int monitorIndex)
+    {
+        var areas = DisplayArea.FindAll();
+        if (monitorIndex >= 0 && monitorIndex < areas.Count) return areas[monitorIndex];
+        return DisplayArea.GetFromWindowId(appWindow.Id, DisplayAreaFallback.Nearest);
+    }
+
+    /// <summary>Прижимает окно к левому или правому краю рабочей области монитора на всю высоту.</summary>
+    public static void Dock(AppWindow appWindow, IntPtr hwnd, int widthDip, bool leftEdge, DisplayArea area)
     {
         var widthPx = (int)Math.Round(widthDip * GetScale(hwnd));
-        var area = DisplayArea.GetFromWindowId(appWindow.Id, DisplayAreaFallback.Nearest).WorkArea;
-        appWindow.MoveAndResize(new RectInt32(
-            area.X + area.Width - widthPx,
-            area.Y,
-            widthPx,
-            area.Height));
+        var wa = area.WorkArea;
+        var x = leftEdge ? wa.X : wa.X + wa.Width - widthPx;
+        appWindow.MoveAndResize(new RectInt32(x, wa.Y, widthPx, wa.Height));
     }
 }
 
 /// <summary>
-/// Регистрация окна как Shell AppBar: система резервирует полосу у правого края экрана,
+/// Регистрация окна как Shell AppBar: система резервирует полосу у края экрана,
 /// и развёрнутые окна не перекрываются панелью (как у панели задач).
 /// </summary>
 public sealed class AppBarHelper
@@ -34,6 +39,7 @@ public sealed class AppBarHelper
     private const int ABM_REMOVE = 0x1;
     private const int ABM_QUERYPOS = 0x2;
     private const int ABM_SETPOS = 0x3;
+    private const int ABE_LEFT = 0;
     private const int ABE_RIGHT = 2;
 
     [StructLayout(LayoutKind.Sequential)]
@@ -56,15 +62,15 @@ public sealed class AppBarHelper
     private IntPtr _hwnd;
     public bool IsRegistered { get; private set; }
 
-    /// <summary>Резервирует полосу справа и возвращает прямоугольник (px), в который нужно поставить окно.</summary>
-    public (int X, int Y, int Width, int Height) Register(IntPtr hwnd, int widthPx, RectInt32 monitorBounds)
+    /// <summary>Резервирует полосу у края и возвращает прямоугольник (px), в который нужно поставить окно.</summary>
+    public (int X, int Y, int Width, int Height) Register(IntPtr hwnd, int widthPx, RectInt32 monitorBounds, bool leftEdge)
     {
         _hwnd = hwnd;
         var data = new APPBARDATA
         {
             cbSize = (uint)Marshal.SizeOf<APPBARDATA>(),
             hWnd = hwnd,
-            uEdge = ABE_RIGHT
+            uEdge = leftEdge ? (uint)ABE_LEFT : ABE_RIGHT
         };
 
         if (!IsRegistered)
@@ -73,16 +79,25 @@ public sealed class AppBarHelper
             IsRegistered = true;
         }
 
-        data.rc = new RECT
-        {
-            Left = monitorBounds.X + monitorBounds.Width - widthPx,
-            Top = monitorBounds.Y,
-            Right = monitorBounds.X + monitorBounds.Width,
-            Bottom = monitorBounds.Y + monitorBounds.Height
-        };
+        data.rc = leftEdge
+            ? new RECT
+            {
+                Left = monitorBounds.X,
+                Top = monitorBounds.Y,
+                Right = monitorBounds.X + widthPx,
+                Bottom = monitorBounds.Y + monitorBounds.Height
+            }
+            : new RECT
+            {
+                Left = monitorBounds.X + monitorBounds.Width - widthPx,
+                Top = monitorBounds.Y,
+                Right = monitorBounds.X + monitorBounds.Width,
+                Bottom = monitorBounds.Y + monitorBounds.Height
+            };
 
         SHAppBarMessage(ABM_QUERYPOS, ref data);
-        data.rc.Left = data.rc.Right - widthPx;
+        if (leftEdge) data.rc.Right = data.rc.Left + widthPx;
+        else data.rc.Left = data.rc.Right - widthPx;
         SHAppBarMessage(ABM_SETPOS, ref data);
 
         return (data.rc.Left, data.rc.Top, data.rc.Right - data.rc.Left, data.rc.Bottom - data.rc.Top);

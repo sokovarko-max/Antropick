@@ -75,17 +75,18 @@ public sealed partial class MainWindow : Window
     {
         var s = App.Settings.Current;
         var widthPx = (int)Math.Round(s.SidebarWidth * WindowInterop.GetScale(_hwnd));
+        var leftEdge = s.DockEdge == "Left";
+        var area = WindowInterop.GetDisplayArea(AppWindow, s.MonitorIndex);
 
         if (s.ReserveScreenSpace)
         {
-            var outer = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Nearest).OuterBounds;
-            var rect = _appBar.Register(_hwnd, widthPx, outer);
+            var rect = _appBar.Register(_hwnd, widthPx, area.OuterBounds, leftEdge);
             AppWindow.MoveAndResize(new Windows.Graphics.RectInt32(rect.X, rect.Y, rect.Width, rect.Height));
         }
         else
         {
             _appBar.Unregister();
-            WindowInterop.DockRight(AppWindow, _hwnd, s.SidebarWidth);
+            WindowInterop.Dock(AppWindow, _hwnd, s.SidebarWidth, leftEdge, area);
         }
     }
 
@@ -99,7 +100,11 @@ public sealed partial class MainWindow : Window
         // Гарантируем, что в настройках есть запись для каждого известного модуля,
         // сохраняя пользовательский порядок
         foreach (var d in ModuleRegistry.All)
-            App.Settings.GetModuleConfig(d.Id);
+        {
+            var isNew = App.Settings.Current.Modules.All(c => c.Id != d.Id);
+            var cfg = App.Settings.GetModuleConfig(d.Id);
+            if (isNew) cfg.Enabled = d.DefaultEnabled;
+        }
 
         foreach (var cfg in App.Settings.Current.Modules)
         {
