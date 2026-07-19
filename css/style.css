@@ -231,6 +231,40 @@ input::placeholder { color: var(--muted); font-weight: 400; }
 .prog-ex-inputs { display: flex; align-items: center; gap: 4px; color: var(--muted); }
 .prog-ex-inputs input { width: 52px; padding: 8px 4px; font-size: 14px; }
 
+/* ---- ИИ-тренер ---- */
+.ai-chat { min-height: 200px; }
+.ai-msg {
+  max-width: 85%;
+  padding: 10px 14px;
+  border-radius: 16px;
+  margin-bottom: 8px;
+  font-size: 15px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.ai-msg.user {
+  background: var(--accent);
+  color: #fff;
+  margin-left: auto;
+  border-bottom-right-radius: 4px;
+}
+.ai-msg.assistant {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  margin-right: auto;
+  border-bottom-left-radius: 4px;
+}
+.ai-quick { display: flex; flex-wrap: wrap; gap: 8px; }
+.ai-input-row {
+  display: flex;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  margin-top: 10px;
+}
+.ai-input-row input { flex: 1; }
+
 /* ---- База знаний ---- */
 .article p { margin-bottom: 12px; font-size: 15px; line-height: 1.55; color: var(--text-2); }
 .article p:first-child { color: var(--text); }

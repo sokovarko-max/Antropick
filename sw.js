@@ -1,5 +1,5 @@
 /* Service worker: офлайн-кэш оболочки приложения */
-const CACHE = 'moyzal-v4';
+const CACHE = 'moyzal-v5';
 const ASSETS = [
   './',
   './index.html',
