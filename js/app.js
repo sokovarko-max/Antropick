@@ -134,6 +134,42 @@ function bestWeight(w, exId) {
   return best;
 }
 
+// Расчётный 1ПМ по Эпли
+function est1rm(w, r) {
+  if (!w || !r) return 0;
+  return r === 1 ? w : w * (1 + r / 30);
+}
+
+// Лучший расчётный 1ПМ упражнения в тренировке
+function best1rm(w, exId) {
+  let best = 0;
+  for (const en of w.entries) {
+    if (en.exId !== exId) continue;
+    for (const s of en.sets) if (s.done) best = Math.max(best, est1rm(s.w, s.r));
+  }
+  return best;
+}
+
+// Объём (тоннаж) упражнения в тренировке
+function exVolume(w, exId) {
+  let v = 0;
+  for (const en of w.entries) {
+    if (en.exId !== exId) continue;
+    for (const s of en.sets) if (s.done) v += s.w * s.r;
+  }
+  return v;
+}
+
+// Рекорды за всё время по упражнению: лучший вес и лучший расчётный 1ПМ
+function bestEver(exId) {
+  let w = 0, orm = 0;
+  for (const wo of state.workouts) {
+    w = Math.max(w, bestWeight(wo, exId));
+    orm = Math.max(orm, best1rm(wo, exId));
+  }
+  return { w, orm };
+}
+
 function toast(msg) {
   const t = document.createElement('div');
   t.className = 'toast';
@@ -158,6 +194,26 @@ function beep() {
     osc.start(); osc.stop(ctx.currentTime + 0.5);
   } catch (e) { /* звук недоступен */ }
 }
+
+/* Экран не гаснет во время активной тренировки */
+let wakeLock = null;
+
+async function requestWakeLock() {
+  try {
+    if (!wakeLock && 'wakeLock' in navigator) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    }
+  } catch (e) { /* не поддерживается или отклонено — не критично */ }
+}
+
+function releaseWakeLock() {
+  if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && state.active) requestWakeLock();
+});
 
 /* ---------- Навигация ---------- */
 
@@ -212,6 +268,8 @@ function renderWorkout() {
   const page = $('#page-workout');
   clearInterval(clockInterval);
 
+  if (state.active) requestWakeLock(); else releaseWakeLock();
+
   if (!state.active) {
     const last = state.workouts[0];
     page.innerHTML = `
@@ -246,6 +304,8 @@ function renderWorkout() {
     </div>
     <div id="active-list"></div>
     <button class="btn secondary" id="add-ex" style="margin-bottom:10px">+ Добавить упражнение</button>
+    <input type="text" id="workout-note" placeholder="Заметка к тренировке (самочувствие, зал…)"
+           value="${esc(a.note || '')}" style="text-align:left;font-weight:400;margin-bottom:10px">
     <button class="btn good" id="finish">Завершить тренировку</button>
     <button class="btn danger-outline" id="cancel" style="margin-top:10px">Отменить</button>
   `;
@@ -261,6 +321,7 @@ function renderWorkout() {
   a.entries.forEach((en, i) => list.appendChild(entryCard(en, i)));
 
   $('#add-ex').addEventListener('click', () => openExercisePicker(addExerciseToActive));
+  $('#workout-note').addEventListener('input', e => { a.note = e.target.value; save(); });
   $('#finish').addEventListener('click', finishWorkout);
   $('#cancel').addEventListener('click', () => {
     if (confirm('Отменить тренировку? Данные не сохранятся.')) {
@@ -394,17 +455,39 @@ function finishWorkout() {
     .map(en => ({ exId: en.exId, sets: en.sets.filter(s => s.done || s.w > 0 || s.r > 0) }))
     .filter(en => en.sets.length > 0);
 
-  state.workouts.unshift({
+  // личные рекорды: сравниваем с лучшими результатами до этой тренировки
+  const prevBests = new Map();
+  for (const en of entries) {
+    if (!prevBests.has(en.exId)) prevBests.set(en.exId, bestEver(en.exId));
+  }
+
+  const workout = {
     id: uid(),
     date: new Date().toISOString(),
     start: a.start,
     end: Date.now(),
     entries,
-  });
+    note: (a.note || '').trim(),
+  };
+  state.workouts.unshift(workout);
+
+  const prs = [];
+  for (const [exId, prev] of prevBests) {
+    const w = bestWeight(workout, exId);
+    if (w > prev.w && prev.w > 0) {
+      const ex = exById(exId);
+      prs.push(`${ex ? ex.name : ''} — ${w} кг`);
+    }
+  }
+
   state.active = null;
   stopRestTimer();
   save();
-  toast('Тренировка сохранена 💪');
+  if (prs.length) {
+    toast(`🏆 Новый рекорд! ${prs.join(' · ')}`);
+  } else {
+    toast('Тренировка сохранена 💪');
+  }
   renderWorkout();
 }
 
@@ -556,8 +639,12 @@ function renderHistory() {
       </div>
       ${expanded.has(w.id) ? `
         <div class="hist-detail">
+          ${w.note ? `<div class="sub" style="margin-bottom:8px">📝 ${esc(w.note)}</div>` : ''}
           ${workoutDetailHtml(w)}
-          <button class="btn danger-outline" data-del style="margin-top:8px;padding:10px;font-size:14px">Удалить тренировку</button>
+          <div class="settings-row" style="margin-top:8px">
+            <button class="btn secondary" data-repeat style="padding:10px;font-size:14px">Повторить</button>
+            <button class="btn danger-outline" data-del style="padding:10px;font-size:14px">Удалить</button>
+          </div>
         </div>` : ''}
     </div>`).join('');
 
@@ -571,6 +658,22 @@ function renderHistory() {
           save();
           renderHistory();
         }
+        return;
+      }
+      if (e.target.closest('[data-repeat]')) {
+        const w = state.workouts.find(x => x.id === id);
+        if (!w) return;
+        if (state.active && !confirm('Уже идёт тренировка. Начать новую вместо неё?')) return;
+        state.active = {
+          start: Date.now(),
+          entries: w.entries.map(en => ({
+            exId: en.exId,
+            sets: en.sets.map(s => ({ w: s.w, r: s.r, done: false })),
+          })),
+        };
+        save();
+        showPage('workout');
+        toast('Прошлая тренировка загружена');
         return;
       }
       expanded.has(id) ? expanded.delete(id) : expanded.add(id);
@@ -668,6 +771,27 @@ function openExerciseLibrary() {
 /* ---------- Экран «Прогресс» ---------- */
 
 let progressExId = null;
+let progressMetric = 'w'; // 'w' — вес, 'orm' — расч. 1ПМ, 'vol' — объём
+
+// Понедельник недели, к которой относится дата
+function weekStart(d) {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
+  return x;
+}
+
+// Сколько недель подряд (включая текущую) была хотя бы одна тренировка
+function weekStreak() {
+  const weeks = new Set(state.workouts.map(w => weekStart(new Date(w.date)).getTime()));
+  if (!weeks.size) return 0;
+  let cursor = weekStart(new Date()).getTime();
+  const WEEK = 7 * 24 * 3600 * 1000;
+  if (!weeks.has(cursor)) cursor -= WEEK; // текущая неделя ещё может быть впереди
+  let n = 0;
+  while (weeks.has(cursor)) { n++; cursor -= WEEK; }
+  return n;
+}
 
 function renderProgress() {
   const page = $('#page-progress');
@@ -694,16 +818,26 @@ function renderProgress() {
       <div class="stat-tile"><div class="stat-value">${state.workouts.length}</div><div class="stat-label">всего тренировок</div></div>
       <div class="stat-tile"><div class="stat-value">${monthWorkouts.length}</div><div class="stat-label">в этом месяце</div></div>
       <div class="stat-tile"><div class="stat-value">${weekWorkouts.length}</div><div class="stat-label">за 7 дней</div></div>
-      <div class="stat-tile"><div class="stat-value">${(totalTonnage / 1000).toFixed(1)} т</div><div class="stat-label">поднято за всё время</div></div>
+      <div class="stat-tile"><div class="stat-value">${weekStreak()}</div><div class="stat-label">недель подряд</div></div>
+      <div class="stat-tile" style="grid-column:1/-1"><div class="stat-value">${(totalTonnage / 1000).toFixed(1)} т</div><div class="stat-label">поднято за всё время</div></div>
     </div>
 
-    <h2>Рабочий вес</h2>
+    <h2>Прогресс упражнения</h2>
     ${usedExs.length ? `
       <select id="progress-ex">
         ${usedExs.map(e => `<option value="${e.id}" ${e.id === progressExId ? 'selected' : ''}>${esc(e.name)}</option>`).join('')}
       </select>
+      <div class="filter-row" style="margin:10px 0 0">
+        <button class="btn-chip ${progressMetric === 'w' ? 'accent' : ''}" data-metric="w">Вес</button>
+        <button class="btn-chip ${progressMetric === 'orm' ? 'accent' : ''}" data-metric="orm">Расч. 1ПМ</button>
+        <button class="btn-chip ${progressMetric === 'vol' ? 'accent' : ''}" data-metric="vol">Объём</button>
+      </div>
+      <div class="sub" id="ex-record" style="margin-top:8px"></div>
       <div class="chart-wrap" id="ex-chart"></div>` : `
       <div class="card chart-empty">Заверши первую тренировку — здесь появится график лучшего веса по каждому упражнению.</div>`}
+
+    <h2>Объём по неделям</h2>
+    <div class="chart-wrap" id="week-chart"></div>
 
     <h2>Вес тела</h2>
     <div class="card">
@@ -723,7 +857,17 @@ function renderProgress() {
       progressExId = e.target.value;
       drawExerciseChart();
     });
+    $$('[data-metric]', page).forEach(b => {
+      b.addEventListener('click', () => {
+        progressMetric = b.dataset.metric;
+        $$('[data-metric]', page).forEach(x => x.classList.toggle('accent', x === b));
+        drawExerciseChart();
+      });
+    });
   }
+
+  // График объёма по неделям
+  drawWeekChart();
 
   // График веса тела
   drawWeightChart();
@@ -744,16 +888,74 @@ function renderProgress() {
 function drawExerciseChart() {
   const el = $('#ex-chart');
   if (!el) return;
+
+  const metricFn = { w: bestWeight, orm: best1rm, vol: exVolume }[progressMetric];
   const pts = [];
   for (let i = state.workouts.length - 1; i >= 0; i--) {
     const w = state.workouts[i];
-    const best = bestWeight(w, progressExId);
-    if (best > 0) pts.push({ label: fmtShortDate(w.date), y: best });
+    const v = metricFn(w, progressExId);
+    if (v > 0) pts.push({ label: fmtShortDate(w.date), y: Math.round(v * 10) / 10 });
   }
+
+  const recEl = $('#ex-record');
+  if (recEl) {
+    const rec = bestEver(progressExId);
+    recEl.innerHTML = rec.w > 0
+      ? `🏆 Рекорды: <b>${rec.w} кг</b> за подход · расч. 1ПМ <b>${Math.round(rec.orm * 2) / 2} кг</b>`
+      : '';
+  }
+
   el.innerHTML = pts.length >= 2
     ? lineChart(pts, 'кг')
     : '<div class="card chart-empty">Нужно минимум две тренировки с этим упражнением.</div>';
   attachChartTooltip(el);
+}
+
+function drawWeekChart() {
+  const el = $('#week-chart');
+  if (!el) return;
+  const WEEK = 7 * 24 * 3600 * 1000;
+  const thisWeek = weekStart(new Date()).getTime();
+  const bars = [];
+  for (let i = 7; i >= 0; i--) {
+    const start = thisWeek - i * WEEK;
+    let vol = 0;
+    for (const w of state.workouts) {
+      if (weekStart(new Date(w.date)).getTime() === start) vol += tonnage(w);
+    }
+    bars.push({ label: fmtShortDate(new Date(start).toISOString()), y: vol });
+  }
+  el.innerHTML = bars.some(b => b.y > 0)
+    ? barChart(bars)
+    : '<div class="card chart-empty">Здесь появится тоннаж по неделям — общий вес, поднятый за каждую неделю.</div>';
+}
+
+/* Столбчатый график недельного объёма (SVG, одна серия) */
+function barChart(bars) {
+  const W = 520, H = 180;
+  const pad = { l: 10, r: 10, t: 24, b: 26 };
+  const iw = W - pad.l - pad.r, ih = H - pad.t - pad.b;
+  const max = Math.max(...bars.map(b => b.y), 1);
+  const gap = 8;
+  const bw = (iw - gap * (bars.length - 1)) / bars.length;
+  const maxIdx = bars.findIndex(b => b.y === max);
+
+  const rects = bars.map((b, i) => {
+    const h = Math.max(b.y > 0 ? 4 : 0, (b.y / max) * ih);
+    const x = pad.l + i * (bw + gap);
+    const y = pad.t + ih - h;
+    // подписываем только максимум и последнюю неделю
+    const label = (b.y > 0 && (i === maxIdx || i === bars.length - 1))
+      ? `<text x="${x + bw / 2}" y="${y - 6}" text-anchor="middle" font-size="11" font-weight="700" fill="var(--text)">${b.y >= 1000 ? (b.y / 1000).toFixed(1) + 'т' : b.y}</text>`
+      : '';
+    return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="4" fill="var(--accent)"/>${label}`;
+  }).join('');
+
+  const axis = `<line x1="${pad.l}" y1="${pad.t + ih}" x2="${W - pad.r}" y2="${pad.t + ih}" stroke="var(--grid)" stroke-width="1"/>`;
+  const xLabels = [0, bars.length - 1].map(i =>
+    `<text x="${pad.l + i * (bw + gap) + bw / 2}" y="${H - 6}" text-anchor="middle" font-size="11" fill="var(--muted)">${esc(bars[i].label)}</text>`).join('');
+
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Объём по неделям, кг">${axis}${rects}${xLabels}</svg>`;
 }
 
 function drawWeightChart() {
@@ -772,14 +974,19 @@ function drawWeightChart() {
 
 function lineChart(pts, unit) {
   const W = 520, H = 220;
-  const pad = { l: 40, r: 16, t: 18, b: 30 };
-  const iw = W - pad.l - pad.r, ih = H - pad.t - pad.b;
 
   let min = Math.min(...pts.map(p => p.y));
   let max = Math.max(...pts.map(p => p.y));
   if (min === max) { min -= 1; max += 1; }
   const range = max - min;
   min -= range * 0.12; max += range * 0.12;
+
+  // подписи оси Y: целые для больших значений, отступ — по ширине самой длинной
+  const fmtY = v => max - min >= 20 ? String(Math.round(v)) : String(Math.round(v * 10) / 10);
+  const yLabels = [0, 1, 2, 3].map(g => fmtY(min + ((max - min) / 3) * g));
+  const maxLabelLen = Math.max(...yLabels.map(s => s.length));
+  const pad = { l: Math.max(40, 14 + maxLabelLen * 7), r: 16, t: 18, b: 30 };
+  const iw = W - pad.l - pad.r, ih = H - pad.t - pad.b;
 
   const x = i => pad.l + (pts.length === 1 ? iw / 2 : (i / (pts.length - 1)) * iw);
   const y = v => pad.t + ih - ((v - min) / (max - min)) * ih;
@@ -791,7 +998,7 @@ function lineChart(pts, unit) {
     const yy = y(v);
     gridLines.push(`
       <line x1="${pad.l}" y1="${yy}" x2="${W - pad.r}" y2="${yy}" stroke="var(--grid)" stroke-width="1"/>
-      <text x="${pad.l - 8}" y="${yy + 4}" text-anchor="end" font-size="11" fill="var(--muted)">${Math.round(v * 10) / 10}</text>`);
+      <text x="${pad.l - 8}" y="${yy + 4}" text-anchor="end" font-size="11" fill="var(--muted)">${yLabels[g]}</text>`);
   }
 
   const path = pts.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.y).toFixed(1)}`).join(' ');
@@ -1101,12 +1308,14 @@ function renderMore() {
     <div class="ex-item" id="more-ex"><span>🏋️ Упражнения<span class="sub"> · ${state.exercises.length} с видео</span></span><span class="sub">›</span></div>
     <div class="ex-item" id="more-kbju"><span>🍎 Калькулятор КБЖУ</span><span class="sub">›</span></div>
     <div class="ex-item" id="more-1rm"><span>💪 Калькулятор 1ПМ</span><span class="sub">›</span></div>
+    <div class="ex-item" id="more-plates"><span>⚖️ Блины на штангу</span><span class="sub">›</span></div>
     <div class="ex-item" id="more-kb"><span>📚 База знаний<span class="sub"> · ${ARTICLES.length} статей</span></span><span class="sub">›</span></div>
     <div class="ex-item" id="more-settings"><span>⚙️ Настройки и резервная копия</span><span class="sub">›</span></div>
   `;
   $('#more-ex').addEventListener('click', openExerciseLibrary);
   $('#more-kbju').addEventListener('click', openKbjuCalc);
   $('#more-1rm').addEventListener('click', open1RmCalc);
+  $('#more-plates').addEventListener('click', openPlateCalc);
   $('#more-kb').addEventListener('click', openKnowledgeBase);
   $('#more-settings').addEventListener('click', openSettings);
 }
@@ -1228,6 +1437,57 @@ function open1RmCalc() {
           <span>${pct}% <span class="sub">· ${use}</span></span>
           <b>${(Math.round(orm * pct / 100 * 2) / 2).toLocaleString('ru-RU')} кг</b>
         </div>`).join('')}
+    `;
+  });
+}
+
+/* ---- Блины на штангу ---- */
+
+function openPlateCalc() {
+  const modal = openModal(`
+    <div class="modal-head">
+      <h2>Блины на штангу</h2>
+      <button class="icon-btn" data-close>✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="sub" style="margin-bottom:12px">Введи целевой вес — покажу, какие блины повесить с каждой стороны грифа.</p>
+      <div class="settings-row" style="margin-bottom:12px">
+        <div style="flex:1"><label class="sub" style="display:block;margin-bottom:6px">Целевой вес, кг</label><input type="number" inputmode="decimal" data-target placeholder="80"></div>
+        <div style="flex:1"><label class="sub" style="display:block;margin-bottom:6px">Гриф, кг</label>
+          <select data-bar><option value="20" selected>20 (олимпийский)</option><option value="15">15 (женский)</option><option value="10">10 (лёгкий)</option><option value="7">7 (EZ-гриф)</option></select>
+        </div>
+      </div>
+      <button class="btn" data-calc>Рассчитать</button>
+      <div data-result style="margin-top:14px"></div>
+    </div>
+  `);
+
+  $('[data-close]', modal).addEventListener('click', closeModal);
+
+  $('[data-calc]', modal).addEventListener('click', () => {
+    const target = parseFloat($('[data-target]', modal).value);
+    const bar = parseFloat($('[data-bar]', modal).value);
+    const out = $('[data-result]', modal);
+    if (!target) { toast('Введи целевой вес'); return; }
+    if (target < bar) {
+      out.innerHTML = `<p class="sub">Целевой вес меньше веса грифа (${bar} кг) — работай с пустым грифом.</p>`;
+      return;
+    }
+    const PLATES = [25, 20, 15, 10, 5, 2.5, 1.25];
+    let perSide = (target - bar) / 2;
+    const used = [];
+    for (const p of PLATES) {
+      while (perSide >= p - 1e-9) { used.push(p); perSide -= p; }
+    }
+    const achieved = target - perSide * 2;
+    out.innerHTML = `
+      <div class="stat-tile" style="margin-bottom:12px">
+        <div class="stat-value">${used.length ? used.join(' + ') : '—'}</div>
+        <div class="stat-label">кг с каждой стороны</div>
+      </div>
+      <p class="sub">${perSide > 1e-9
+        ? `Точно ${target} кг стандартными блинами не собрать. Ближайший вес: <b>${Math.round(achieved * 100) / 100} кг</b> (гриф ${bar} + блины).`
+        : `Итого на штанге: <b>${target} кг</b> (гриф ${bar} кг + ${used.length ? used.map(p => p + '×2').join(' + ') : 'без блинов'}).`}</p>
     `;
   });
 }
