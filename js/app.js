@@ -502,25 +502,30 @@ function finishWorkout() {
 
 /* ---------- Таймер отдыха ---------- */
 
-let restLeft = 0;
+/* Таймер считает от абсолютного времени: не сбивается, если iOS
+   приостановила страницу в фоне — при возврате сразу сработает. */
+let restEndAt = 0;
 let restInterval = null;
 
 function startRestTimer() {
-  restLeft = state.settings.restSec;
+  restEndAt = Date.now() + state.settings.restSec * 1000;
   $('#rest-timer').classList.remove('hidden');
   updateRestUI();
   clearInterval(restInterval);
-  restInterval = setInterval(() => {
-    restLeft--;
-    if (restLeft <= 0) {
-      stopRestTimer();
-      beep();
-      vibrate([200, 100, 200]);
-      toast('Отдых окончен — следующий подход!');
-      return;
-    }
-    updateRestUI();
-  }, 1000);
+  restInterval = setInterval(tickRest, 500);
+}
+
+function tickRest() {
+  if (Date.now() >= restEndAt) { finishRest(); return; }
+  updateRestUI();
+}
+
+function finishRest() {
+  stopRestTimer();
+  beep();
+  vibrate([200, 100, 200]);
+  toast('Отдых окончен — следующий подход!');
+  notifyRestDone();
 }
 
 function stopRestTimer() {
@@ -530,15 +535,33 @@ function stopRestTimer() {
 }
 
 function updateRestUI() {
-  const m = Math.floor(restLeft / 60), s = restLeft % 60;
+  const left = Math.max(0, Math.round((restEndAt - Date.now()) / 1000));
+  const m = Math.floor(left / 60), s = left % 60;
   $('#rest-time').textContent = `${m}:${String(s).padStart(2, '0')}`;
 }
 
 $('#rest-plus').addEventListener('click', () => {
-  restLeft += 15;
+  restEndAt += 15000;
   updateRestUI();
 });
 $('#rest-skip').addEventListener('click', stopRestTimer);
+
+/* Системное уведомление об окончании отдыха. На заблокированном iPhone
+   iOS сама дублирует его на Apple Watch. Требует установленного PWA
+   (значок на экране «Домой») и разрешения на уведомления. */
+async function notifyRestDone() {
+  try {
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+    const reg = await navigator.serviceWorker.ready;
+    reg.showNotification('Отдых окончен 💪', {
+      body: 'Пора делать следующий подход!',
+      icon: './icons/icon-192.png',
+      badge: './icons/icon-192.png',
+      tag: 'rest-done',
+      vibrate: [200, 100, 200],
+    });
+  } catch (e) { /* уведомления недоступны — звук и баннер уже сработали */ }
+}
 
 /* ---------- Выбор упражнения ---------- */
 
@@ -647,10 +670,12 @@ function renderHistory() {
   page.innerHTML = `<h1>История</h1>` + items.map(it => it.kind === 'watch' ? `
     <div class="card hist-card" data-watch="${it.w.id}">
       <div class="hist-date">⌚ ${esc(it.w.type)}</div>
-      <div class="hist-meta">
+      <div class="hist-meta" style="flex-wrap:wrap">
         <span>${esc(fmtDate(it.w.date))}</span>
         ${it.w.min ? `<span>⏱ ${it.w.min} мин</span>` : ''}
         ${it.w.kcal ? `<span>🔥 ${it.w.kcal} ккал</span>` : ''}
+        ${it.w.hr ? `<span>❤️ ${it.w.hr}${it.w.hrMax ? '–' + it.w.hrMax : ''}</span>` : ''}
+        ${it.w.km ? `<span>📏 ${it.w.km} км</span>` : ''}
       </div>
     </div>` : `
     <div class="card hist-card" data-id="${it.w.id}">
@@ -872,6 +897,26 @@ function renderProgress() {
 
     <h2>Объём по неделям</h2>
     <div class="chart-wrap" id="week-chart"></div>
+
+    ${(() => {
+      if (!state.watch.length) return '';
+      const cutoff = Date.now() - 28 * 24 * 3600 * 1000;
+      const recent = state.watch.filter(w => new Date(w.date).getTime() >= cutoff);
+      if (!recent.length) return '';
+      const mins = recent.reduce((t, w) => t + (w.min || 0), 0);
+      const kcal = recent.reduce((t, w) => t + (w.kcal || 0), 0);
+      const kms = Math.round(recent.reduce((t, w) => t + (w.km || 0), 0) * 10) / 10;
+      const hrs = recent.filter(w => w.hr > 0);
+      const avgHr = hrs.length ? Math.round(hrs.reduce((t, w) => t + w.hr, 0) / hrs.length) : 0;
+      return `
+        <h2>⌚ Здоровье за 4 недели</h2>
+        <div class="stat-grid">
+          <div class="stat-tile"><div class="stat-value">${mins}</div><div class="stat-label">минут кардио</div></div>
+          <div class="stat-tile"><div class="stat-value">${kcal.toLocaleString('ru-RU')}</div><div class="stat-label">ккал сожжено</div></div>
+          <div class="stat-tile"><div class="stat-value">${avgHr ? '❤️ ' + avgHr : '—'}</div><div class="stat-label">средний пульс</div></div>
+          <div class="stat-tile"><div class="stat-value">${kms ? kms + ' км' : '—'}</div><div class="stat-label">дистанция</div></div>
+        </div>`;
+    })()}
 
     <h2>Вес тела</h2>
     <div class="card">
@@ -1782,19 +1827,45 @@ async function parseHealthExport(file, progressCb) {
       const unit = healthAttr(tag, 'durationUnit');
       if (unit === 'sec') min = Math.round(min / 60);
 
-      // калории: старый формат — атрибут, новый — вложенная статистика рядом
+      // вложенная статистика тренировки (новый формат экспорта)
+      let block = text.slice(m.index, m.index + 8000);
+      const blockEnd = block.indexOf('</Workout>');
+      if (blockEnd > 0) block = block.slice(0, blockEnd);
+
+      // калории: старый формат — атрибут, новый — WorkoutStatistics
       let kcal = Math.round(parseFloat(healthAttr(tag, 'totalEnergyBurned')) || 0);
       if (!kcal) {
-        const after = text.slice(m.index, m.index + 4000);
-        const em = after.match(/HKQuantityTypeIdentifierActiveEnergyBurned"[^>]*sum="([0-9.]+)"/);
+        const em = block.match(/HKQuantityTypeIdentifierActiveEnergyBurned"[^>]*sum="([0-9.]+)"/);
         if (em) kcal = Math.round(parseFloat(em[1]));
       }
+
+      // пульс: средний и максимальный
+      let hr = 0, hrMax = 0;
+      const hrTag = block.match(/<WorkoutStatistics[^>]*HKQuantityTypeIdentifierHeartRate[^>]*>/);
+      if (hrTag) {
+        hr = Math.round(parseFloat(healthAttr(hrTag[0], 'average')) || 0);
+        hrMax = Math.round(parseFloat(healthAttr(hrTag[0], 'maximum')) || 0);
+      }
+
+      // дистанция: старый формат — атрибут totalDistance, новый — статистика
+      let km = parseFloat(healthAttr(tag, 'totalDistance')) || 0;
+      let distUnit = healthAttr(tag, 'totalDistanceUnit');
+      if (!km) {
+        const dTag = block.match(/<WorkoutStatistics[^>]*HKQuantityTypeIdentifierDistance[A-Za-z]*[^>]*>/);
+        if (dTag) {
+          km = parseFloat(healthAttr(dTag[0], 'sum')) || 0;
+          distUnit = healthAttr(dTag[0], 'unit');
+        }
+      }
+      if (distUnit === 'm') km /= 1000;
+      else if (/mi/.test(distUnit)) km *= 1.609;
+      km = Math.round(km * 100) / 100;
 
       workouts.set(key, {
         id: 'aw' + start.getTime() + actRaw.length,
         date: start.toISOString(),
         type: WATCH_TYPES[actRaw] || actRaw,
-        min, kcal,
+        min, kcal, hr, hrMax, km,
       });
     }
 
@@ -1859,8 +1930,13 @@ function openWatchImport() {
         status.textContent = `Читаю файл… ${p}%`;
       });
 
-      const known = new Set(state.watch.map(w => w.id));
-      const fresh = workouts.filter(w => !known.has(w.id));
+      const byId = new Map(state.watch.map(w => [w.id, w]));
+      const fresh = [];
+      for (const w of workouts) {
+        const ex = byId.get(w.id);
+        if (ex) Object.assign(ex, w); // дозаполняем метрики (пульс, км) в старых записях
+        else fresh.push(w);
+      }
       state.watch.push(...fresh);
       state.watch.sort((a, b) => b.date.localeCompare(a.date));
 
@@ -1931,6 +2007,10 @@ function openSettings() {
         <input type="range" min="30" max="300" step="15" value="${state.settings.restSec}" data-rest-range style="width:100%">
       </div>
       <div class="card">
+        <p class="sub" style="margin-bottom:10px">Уведомление «Отдых окончен» приходит со звуком, а на заблокированном iPhone дублируется на <b>Apple Watch</b>. Работает в приложении, установленном на экран «Домой».</p>
+        <button class="btn secondary" data-notif></button>
+      </div>
+      <div class="card">
         <p class="sub" style="margin-bottom:10px">Все данные хранятся только на этом телефоне. Сохраняй резервную копию, чтобы не потерять историю.</p>
         <div class="settings-row">
           <button class="btn secondary" data-export>Экспорт данных</button>
@@ -1946,6 +2026,29 @@ function openSettings() {
     state.settings.restSec = +e.target.value;
     $('[data-rest-val]', modal).textContent = e.target.value;
     save();
+  });
+
+  const notifBtn = $('[data-notif]', modal);
+  function drawNotifBtn() {
+    if (typeof Notification === 'undefined') {
+      notifBtn.textContent = 'Уведомления недоступны в этом браузере';
+      notifBtn.disabled = true;
+    } else if (Notification.permission === 'granted') {
+      notifBtn.textContent = '✓ Уведомления об отдыхе включены';
+      notifBtn.disabled = true;
+    } else if (Notification.permission === 'denied') {
+      notifBtn.textContent = 'Запрещены — включи в настройках iPhone для этого приложения';
+      notifBtn.disabled = true;
+    } else {
+      notifBtn.textContent = 'Включить уведомления об отдыхе';
+      notifBtn.disabled = false;
+    }
+  }
+  drawNotifBtn();
+  notifBtn.addEventListener('click', async () => {
+    const perm = await Notification.requestPermission();
+    drawNotifBtn();
+    if (perm === 'granted') toast('Уведомления включены 🔔');
   });
   $('[data-export]', modal).addEventListener('click', exportData);
   $('[data-import]', modal).addEventListener('click', () => $('[data-import-file]', modal).click());
