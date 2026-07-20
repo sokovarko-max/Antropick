@@ -1,10 +1,11 @@
 /* Service worker: офлайн-кэш оболочки приложения */
-const CACHE = 'moyzal-v6';
+const CACHE = 'moyzal-v7';
 const ASSETS = [
   './',
   './index.html',
   './css/style.css',
   './js/data.js',
+  './js/recipes.js',
   './js/app.js',
   './manifest.webmanifest',
   './icons/icon-192.png',

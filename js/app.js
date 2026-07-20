@@ -1390,6 +1390,7 @@ function renderMore() {
     <div class="ex-item" id="more-plates"><span>⚖️ Блины на штангу</span><span class="sub">›</span></div>
     <div class="ex-item" id="more-watch"><span>⌚ Импорт из Apple Watch<span class="sub">${state.watch.length ? ' · ' + state.watch.length : ''}</span></span><span class="sub">›</span></div>
     <div class="ex-item" id="more-ai"><span>🤖 ИИ-тренер<span class="sub">${state.settings.ai && state.settings.ai.key ? ' · подключён' : ' · бесплатно'}</span></span><span class="sub">›</span></div>
+    <div class="ex-item" id="more-recipes"><span>🍽️ Книга рецептов<span class="sub"> · ${RECIPES.length} блюд</span></span><span class="sub">›</span></div>
     <div class="ex-item" id="more-kb"><span>📚 База знаний<span class="sub"> · ${ARTICLES.length} статей</span></span><span class="sub">›</span></div>
     <div class="ex-item" id="more-settings"><span>⚙️ Настройки и резервная копия</span><span class="sub">›</span></div>
   `;
@@ -1399,6 +1400,7 @@ function renderMore() {
   $('#more-plates').addEventListener('click', openPlateCalc);
   $('#more-watch').addEventListener('click', openWatchImport);
   $('#more-ai').addEventListener('click', openAiCoach);
+  $('#more-recipes').addEventListener('click', () => openRecipes());
   $('#more-kb').addEventListener('click', openKnowledgeBase);
   $('#more-settings').addEventListener('click', openSettings);
 }
@@ -1955,6 +1957,103 @@ function openWatchImport() {
     }
     e.target.value = '';
   });
+}
+
+/* ---- Книга рецептов ---- */
+
+let recipeCat = 'Все';
+
+function openRecipes() {
+  const modal = openModal(`
+    <div class="modal-head">
+      <h2>🍽️ Книга рецептов</h2>
+      <button class="icon-btn" data-close>✕</button>
+    </div>
+    <div class="search-row">
+      <input type="text" placeholder="Поиск блюда или ингредиента…" data-search>
+    </div>
+    <div class="filter-row" data-cats></div>
+    <div class="modal-body" data-list></div>
+  `);
+
+  const listEl = $('[data-list]', modal);
+  const searchEl = $('[data-search]', modal);
+  const catsEl = $('[data-cats]', modal);
+
+  catsEl.innerHTML = ['Все', ...RECIPE_CATS]
+    .map(c => `<button class="btn-chip ${c === recipeCat ? 'accent' : ''}" data-cat="${esc(c)}">${esc(c)}</button>`).join('');
+
+  function draw() {
+    const f = searchEl.value.trim().toLowerCase();
+    let list = RECIPES;
+    if (recipeCat !== 'Все') list = list.filter(r => r.cat === recipeCat);
+    if (f) list = list.filter(r =>
+      r.name.toLowerCase().includes(f) || r.ing.some(i => i.toLowerCase().includes(f)));
+
+    if (!list.length) {
+      listEl.innerHTML = '<div class="empty-state">Ничего не найдено</div>';
+      return;
+    }
+
+    // группируем по категориям (когда выбрано «Все»)
+    let html = '';
+    for (const cat of RECIPE_CATS) {
+      const inCat = list.filter(r => r.cat === cat);
+      if (!inCat.length) continue;
+      if (recipeCat === 'Все') html += `<div class="group-title">${esc(cat)}</div>`;
+      html += inCat.map(r => `
+        <div class="ex-item recipe-item" data-id="${r.id}">
+          <span>${esc(r.name)}${r.k ? `<span class="sub"> · ${r.k[0]} ккал</span>` : ''}</span>
+          <span class="sub">›</span>
+        </div>`).join('');
+    }
+    if (!f) html += `<div class="card article" style="margin-top:14px"><div class="group-title" style="margin-top:0">Общие рекомендации</div><p class="sub">${esc(RECIPES_NOTE)}</p></div>`;
+    listEl.innerHTML = html;
+    $$('.recipe-item', listEl).forEach(item => {
+      item.addEventListener('click', () => {
+        const r = RECIPES.find(x => x.id === item.dataset.id);
+        if (r) openRecipe(r);
+      });
+    });
+  }
+
+  draw();
+  searchEl.addEventListener('input', draw);
+  $$('[data-cat]', catsEl).forEach(b => b.addEventListener('click', () => {
+    recipeCat = b.dataset.cat;
+    $$('[data-cat]', catsEl).forEach(x => x.classList.toggle('accent', x === b));
+    draw();
+  }));
+  $('[data-close]', modal).addEventListener('click', closeModal);
+}
+
+function openRecipe(r) {
+  const kbju = r.k
+    ? `<div class="stat-grid" style="margin-bottom:12px">
+        <div class="stat-tile"><div class="stat-value">${r.k[0]}</div><div class="stat-label">ккал</div></div>
+        <div class="stat-tile"><div class="stat-value">${r.k[1]} г</div><div class="stat-label">белки</div></div>
+        <div class="stat-tile"><div class="stat-value">${r.k[2]} г</div><div class="stat-label">жиры</div></div>
+        <div class="stat-tile"><div class="stat-value">${r.k[3]} г</div><div class="stat-label">углеводы</div></div>
+      </div>`
+    : '';
+
+  const modal = openModal(`
+    <div class="modal-head">
+      <h2>${esc(r.name)}</h2>
+      <button class="icon-btn" data-close>✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="sub" style="margin-bottom:12px">${esc(r.cat)}${r.note ? ' · ' + esc(r.note) : ''}</div>
+      ${kbju}
+      <div class="group-title">Ингредиенты</div>
+      <ul class="recipe-ing">${r.ing.map(i => `<li>${esc(i)}</li>`).join('')}</ul>
+      <div class="group-title">Приготовление</div>
+      <ol class="recipe-steps">${r.steps.map(s => `<li>${esc(s)}</li>`).join('')}</ol>
+      <button class="btn secondary" data-back style="margin-top:14px">← Ко всем рецептам</button>
+    </div>
+  `);
+  $('[data-close]', modal).addEventListener('click', closeModal);
+  $('[data-back]', modal).addEventListener('click', () => openRecipes());
 }
 
 /* ---- База знаний ---- */

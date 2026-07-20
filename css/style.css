@@ -269,6 +269,20 @@ input::placeholder { color: var(--muted); font-weight: 400; }
 .article p { margin-bottom: 12px; font-size: 15px; line-height: 1.55; color: var(--text-2); }
 .article p:first-child { color: var(--text); }
 
+/* ---- Рецепты ---- */
+.recipe-ing, .recipe-steps { margin: 0 0 6px; padding-left: 22px; }
+.recipe-ing li, .recipe-steps li {
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text-2);
+  margin-bottom: 7px;
+}
+.recipe-ing { list-style: none; padding-left: 4px; }
+.recipe-ing li { position: relative; padding-left: 18px; }
+.recipe-ing li::before { content: '•'; position: absolute; left: 2px; color: var(--accent); font-weight: 700; }
+.recipe-steps li { padding-left: 4px; }
+.recipe-steps li::marker { color: var(--accent); font-weight: 700; }
+
 /* ---- Прогресс ---- */
 .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 6px; }
 .stat-tile {
