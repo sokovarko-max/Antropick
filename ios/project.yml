@@ -1,0 +1,42 @@
+# XcodeGen-конфигурация. Генерирует MoyZal.xcodeproj из исходников.
+# Установка XcodeGen: brew install xcodegen
+# Генерация проекта:   cd ios && xcodegen generate
+name: MoyZal
+options:
+  bundleIdPrefix: com.moyzal
+  deploymentTarget:
+    iOS: "16.4"
+settings:
+  base:
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    DEVELOPMENT_TEAM: "" # ← подставь свой Team ID из Apple Developer (можно оставить и выбрать в Xcode)
+    CODE_SIGN_STYLE: Automatic
+targets:
+  MoyZal:
+    type: application
+    platform: iOS
+    sources:
+      - MoyZal/Sources
+    entitlements:
+      path: MoyZal/MoyZal.entitlements
+      properties:
+        com.apple.developer.healthkit: true
+    info:
+      path: MoyZal/Info.plist
+      properties:
+        CFBundleDisplayName: Мой Зал
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UIBackgroundModes:
+          - processing
+        NSHealthShareUsageDescription: >-
+          Приложению нужен доступ к данным «Здоровья», чтобы автоматически
+          показывать ваши тренировки с Apple Watch, пульс, калории и вес тела.
+        NSHealthUpdateUsageDescription: >-
+          Доступ к «Здоровью» используется только для чтения ваших тренировок и веса.
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.moyzal.app
+        INFOPLIST_KEY_CFBundleDisplayName: Мой Зал
