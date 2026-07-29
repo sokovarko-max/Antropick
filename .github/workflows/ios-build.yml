@@ -1,0 +1,56 @@
+name: iOS build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'ios/**'
+      - '.github/workflows/ios-build.yml'
+  pull_request:
+    paths:
+      - 'ios/**'
+      - '.github/workflows/ios-build.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: ios
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Показать версию Xcode
+        run: xcodebuild -version
+
+      - name: Установить XcodeGen
+        run: brew install xcodegen
+
+      - name: Сгенерировать проект
+        run: xcodegen generate
+
+      - name: Выбрать доступный симулятор iPhone
+        id: sim
+        run: |
+          DEST=$(xcodebuild -project MoyZal.xcodeproj -scheme MoyZal \
+            -showdestinations 2>/dev/null \
+            | grep -m1 'platform:iOS Simulator.*name:iPhone' \
+            | sed -E 's/.*id:([0-9A-F-]+).*/\1/')
+          if [ -z "$DEST" ]; then echo "Симулятор не найден"; exit 1; fi
+          echo "id=$DEST" >> "$GITHUB_OUTPUT"
+          echo "Симулятор: $DEST"
+
+      - name: Сборка под симулятор
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project MoyZal.xcodeproj \
+            -scheme MoyZal \
+            -destination "id=${{ steps.sim.outputs.id }}" \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcbeautify || xcodebuild build \
+            -project MoyZal.xcodeproj \
+            -scheme MoyZal \
+            -destination "id=${{ steps.sim.outputs.id }}" \
+            CODE_SIGNING_ALLOWED=NO

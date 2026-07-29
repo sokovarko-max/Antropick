@@ -40,3 +40,5 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.moyzal.app
         INFOPLIST_KEY_CFBundleDisplayName: Мой Зал
+    scheme:
+      testTargets: []
