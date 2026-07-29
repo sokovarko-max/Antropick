@@ -103,9 +103,9 @@ struct WorkoutView: View {
 }
 
 private struct EntryCard: View {
-    @EnvironmentObject var store: Store
-    @ObservedObject var rest: RestTimer
     let entryIndex: Int
+    @ObservedObject var rest: RestTimer
+    @EnvironmentObject var store: Store
 
     private var entry: WorkoutEntry? {
         guard let e = store.active?.entries, entryIndex < e.count else { return nil }
