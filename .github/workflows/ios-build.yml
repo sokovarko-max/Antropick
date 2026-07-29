@@ -30,27 +30,12 @@ jobs:
       - name: Сгенерировать проект
         run: xcodegen generate
 
-      - name: Выбрать доступный симулятор iPhone
-        id: sim
-        run: |
-          DEST=$(xcodebuild -project MoyZal.xcodeproj -scheme MoyZal \
-            -showdestinations 2>/dev/null \
-            | grep -m1 'platform:iOS Simulator.*name:iPhone' \
-            | sed -E 's/.*id:([0-9A-F-]+).*/\1/')
-          if [ -z "$DEST" ]; then echo "Симулятор не найден"; exit 1; fi
-          echo "id=$DEST" >> "$GITHUB_OUTPUT"
-          echo "Симулятор: $DEST"
-
-      - name: Сборка под симулятор
+      - name: Сборка под симулятор iOS (проверка компиляции)
         run: |
           set -o pipefail
           xcodebuild build \
             -project MoyZal.xcodeproj \
             -scheme MoyZal \
-            -destination "id=${{ steps.sim.outputs.id }}" \
-            CODE_SIGNING_ALLOWED=NO \
-            | xcbeautify || xcodebuild build \
-            -project MoyZal.xcodeproj \
-            -scheme MoyZal \
-            -destination "id=${{ steps.sim.outputs.id }}" \
+            -destination 'generic/platform=iOS Simulator' \
+            -configuration Debug \
             CODE_SIGNING_ALLOWED=NO
