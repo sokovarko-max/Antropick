@@ -39,3 +39,32 @@ jobs:
             -destination 'generic/platform=iOS Simulator' \
             -configuration Debug \
             CODE_SIGNING_ALLOWED=NO
+
+      - name: Сборка под устройство без подписи
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project MoyZal.xcodeproj \
+            -scheme MoyZal \
+            -sdk iphoneos \
+            -configuration Release \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Упаковать в неподписанный .ipa
+        run: |
+          APP_DIR="build/Build/Products/Release-iphoneos"
+          if [ ! -d "$APP_DIR/MoyZal.app" ]; then echo "MoyZal.app не собран"; exit 1; fi
+          rm -rf Payload MoyZal-unsigned.ipa
+          mkdir Payload
+          cp -R "$APP_DIR/MoyZal.app" Payload/
+          zip -qry MoyZal-unsigned.ipa Payload
+          rm -rf Payload
+          echo "Готово:"; ls -lh MoyZal-unsigned.ipa
+
+      - name: Выложить .ipa как артефакт
+        uses: actions/upload-artifact@v4
+        with:
+          name: MoyZal-unsigned-ipa
+          path: ios/MoyZal-unsigned.ipa
+          if-no-files-found: error
