@@ -1,0 +1,134 @@
+export type Speaker = "CANDIDATE" | "INTERVIEWER" | "UNKNOWN";
+
+export interface TranscriptSegment {
+  id: string;
+  sessionId: string;
+  speaker: Speaker;
+  text: string;
+  timestampMs: number;
+  confidence: number;
+}
+
+export type QuestionType =
+  | "QUESTION"
+  | "FOLLOW_UP"
+  | "TECHNICAL_TASK"
+  | "BEHAVIORAL_QUESTION"
+  | "SMALL_TALK"
+  | "IRRELEVANT";
+
+export interface QuestionDetectionResult {
+  isQuestion: boolean;
+  questionType: QuestionType;
+  urgency: number; // 0-1
+  relevance: number; // 0-1
+  requiresVision: boolean;
+  requiresUserProfile: boolean;
+}
+
+export type ResponseMode = "SHORT" | "NORMAL" | "DETAILED";
+
+export type InterviewFramework =
+  | "STAR"
+  | "PREP"
+  | "CAR"
+  | "TECHNICAL"
+  | "SYSTEM_DESIGN"
+  | "BEHAVIORAL"
+  | "SALES"
+  | "PRODUCT_MANAGEMENT"
+  | "NONE";
+
+export type SessionMode = "AUTO" | "MANUAL";
+
+export interface UserProfile {
+  name: string;
+  role: string;
+  experienceYears: number | null;
+  skills: string[];
+  companies: string[];
+  projects: string[];
+  technologies: string[];
+  achievements: string[];
+  preferredAnswerStyle: string;
+}
+
+export interface DocumentChunk {
+  id: string;
+  documentId: string;
+  sessionId: string;
+  docType: "RESUME" | "JOB_DESCRIPTION" | "PORTFOLIO" | "NOTES" | "OTHER";
+  text: string;
+  order: number;
+}
+
+export interface AssembledContext {
+  currentUtterance: string;
+  recentTranscript: TranscriptSegment[];
+  sessionSummary: string | null;
+  resumeChunks: DocumentChunk[];
+  jobDescriptionChunks: DocumentChunk[];
+  userInstructions: string;
+  responseMode: ResponseMode;
+  framework: InterviewFramework;
+  screenshotBase64?: string;
+}
+
+export interface AIResponseRecord {
+  id: string;
+  sessionId: string;
+  taskType: string;
+  prompt: string;
+  answer: string;
+  keyPoints: string[];
+  createdAtMs: number;
+  inputTokens: number;
+  outputTokens: number;
+  estimatedCostUsd: number;
+}
+
+export interface Session {
+  id: string;
+  title: string;
+  role: string;
+  company: string;
+  startTimeMs: number;
+  endTimeMs: number | null;
+  mode: SessionMode;
+  modelProfileOverride: string | null;
+  responseLanguage: "en" | "ru";
+  responseMode: ResponseMode;
+  framework: InterviewFramework;
+  userInstructions: string;
+  summary: string | null;
+}
+
+export type ScoreCategory =
+  | "TECHNICAL"
+  | "COMMUNICATION"
+  | "STRUCTURE"
+  | "RELEVANCE"
+  | "CONFIDENCE"
+  | "EXPERIENCE"
+  | "PROBLEM_SOLVING";
+
+export interface CategoryScore {
+  category: ScoreCategory;
+  score: number; // 0-100
+  evidence: string;
+}
+
+export interface SessionAnalysis {
+  sessionId: string;
+  overallScore: number;
+  categoryScores: CategoryScore[];
+  strengths: string[];
+  weaknesses: string[];
+  missedOpportunities: string[];
+  redFlags: string[];
+  bestAnswers: string[];
+  weakestAnswers: string[];
+  recommendations: string[];
+}
+
+export type OverlayState = "IDLE" | "LISTENING" | "THINKING" | "ANSWERING" | "ERROR";
