@@ -1,0 +1,17 @@
+{
+  "name": "Со-Пилот — ИИ-ассистент созвонов",
+  "short_name": "Со-Пилот",
+  "description": "Слушает рабочий созвон/брейншторм через микрофон и подсказывает идеи и решения только вам, на базе Claude Haiku.",
+  "lang": "ru",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0d0d10",
+  "theme_color": "#0d0d10",
+  "icons": [
+    { "src": "./icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "./icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "./icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
