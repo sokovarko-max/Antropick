@@ -12,6 +12,7 @@ const defaultSettings = {
   context: '',
   autoSuggest: true,
   autoIntervalMs: 3000,
+  panelOpacity: 1,
 };
 
 function loadSettings() {
@@ -38,6 +39,7 @@ const state = {
   silenceTimer: null,
   loadingKinds: new Set(),
   historyOpenId: null,
+  panelCollapsed: false,
 };
 
 function newSession() {
@@ -256,8 +258,19 @@ function renderCall() {
   page.innerHTML = `
     <header class="topbar">
       <h1>Со-Пилот</h1>
-      <button class="btn-ghost" id="btn-new-session" title="Новый созвон">Новый созвон</button>
+      <div class="topbar-actions">
+        <button class="btn-accent" id="btn-private-panel">
+          ${isPrivatePanelOpen() ? 'Закрыть панель' : '🔒 Приватная панель'}
+        </button>
+        <button class="btn-ghost" id="btn-new-session" title="Новый созвон">Новый созвон</button>
+      </div>
     </header>
+
+    ${isPrivatePanelOpen() ? `
+      <div class="panel-open-note">
+        Подсказки идут в отдельное плавающее окно. Шарьте на созвоне вкладку
+        встречи или конкретное окно — панель в трансляцию не попадёт.
+      </div>` : ''}
 
     <div class="mic-panel">
       <button class="mic-btn ${micOn ? 'on' : ''}" id="btn-mic" aria-pressed="${micOn}">
@@ -321,6 +334,9 @@ function renderCall() {
   `;
 
   document.getElementById('btn-mic').onclick = toggleListening;
+  document.getElementById('btn-private-panel').onclick = () => {
+    if (isPrivatePanelOpen()) closePrivatePanel(); else openPrivatePanel();
+  };
   document.getElementById('btn-new-session').onclick = () => {
     if (s.transcript.length && !confirm('Начать новый созвон? Текущий уже сохранён в истории.')) return;
     startNewSession();
@@ -346,6 +362,9 @@ function renderCall() {
   list.scrollTop = list.scrollHeight;
   const sug = document.getElementById('suggestions-list');
   if (sug) sug.scrollTop = 0;
+
+  // держим плавающую панель в актуальном состоянии
+  if (isPrivatePanelOpen()) renderPrivatePanel();
 }
 
 function debounce(fn, ms) {
@@ -455,6 +474,7 @@ function renderSettings() {
 
       <div class="note">
         <p><strong>Как это работает.</strong> Приложение слушает микрофон вашего устройства (в том числе то, что доносится из динамиков — голоса собеседников), распознаёт речь прямо в браузере через Web Speech API и присылает свежий фрагмент транскрипта модели Claude. Подсказки видите только вы на экране — участники звонка ничего не получают.</p>
+        <p><strong>Приватная панель.</strong> Кнопка «🔒 Приватная панель» на вкладке «Созвон» (или Ctrl+Shift+H) выносит подсказки в отдельное плавающее окно. Если вы шарите вкладку встречи или конкретное окно — панель в трансляцию не попадёт. При демонстрации всего экрана она будет видна: браузер не может исключить страницу из захвата экрана на уровне системы.</p>
         <p><strong>Приватность.</strong> Распознавание речи в Chrome/Edge выполняется через сервисы Google (так устроен Web Speech API в этих браузерах). Транскрипт и ваш API-ключ уходят напрямую в api.anthropic.com — ни на какой другой сервер данные не передаются.</p>
         <p><strong>Поддержка браузеров.</strong> Постоянное распознавание речи надёжно работает в Chrome/Edge на компьютере и Android. В Safari/iOS поддержка ограничена или отсутствует.</p>
       </div>
@@ -492,6 +512,14 @@ document.querySelectorAll('.tab').forEach(tab => {
 /* ---------- Инициализация ---------- */
 
 renderCall();
+
+// Ctrl+Shift+H — открыть приватную панель / свернуть её содержимое
+document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey && e.shiftKey && (e.key === 'H' || e.key === 'h' || e.code === 'KeyH')) {
+    e.preventDefault();
+    if (isPrivatePanelOpen()) togglePanelCollapsed(); else openPrivatePanel();
+  }
+});
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

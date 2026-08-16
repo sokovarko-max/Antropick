@@ -1,11 +1,12 @@
 // Service worker: офлайн-кэш оболочки приложения (запросы к api.anthropic.com не кэшируются)
-const CACHE = 'copilot-v1';
+const CACHE = 'copilot-v2';
 const ASSETS = [
   './',
   './index.html',
   './css/style.css',
   './js/claude.js',
   './js/speech.js',
+  './js/private-panel.js',
   './js/app.js',
   './manifest.webmanifest',
   './icons/icon-192.png',
