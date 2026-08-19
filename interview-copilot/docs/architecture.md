@@ -125,8 +125,10 @@ PDF/DOCX/TXT/MD parsing happens in the frontend (`pdfjs-dist`, `mammoth`) since 
 
 ## 9. Known environment constraints (this build environment)
 
-This scaffold was produced in a Linux container with no Windows, no audio hardware, no `webkit2gtk` system libraries, and no Anthropic API key. Concretely:
-- The Rust `src-tauri` crate cannot be compiled here (Tauri requires WebKitGTK dev headers on Linux to build at all, even for a Windows cross-target check). It is written to compile on a real Windows/Tauri dev machine but is **untested by this session**.
-- Audio capture, global hotkeys, screenshot capture, and Windows Credential Manager storage are implemented as Rust modules with the correct crate choices and command surface, but cannot be exercised here.
-- The TypeScript layer (AIProvider, ModelRouter, ContextEngine, MemoryManager, QuestionDetector, database schema, UI) is fully testable and buildable in this environment and is covered by `pnpm build` / `pnpm test` / `pnpm lint` run in this session.
-- No Windows installer can be produced from this container; `pnpm tauri build` must be run on Windows (or CI with a `windows-latest` runner).
+Built in a Linux container with no Windows, no audio hardware, and no Anthropic API key. After installing the Linux system libraries listed in `CLAUDE.md`, the Rust crate **does** compile here, so the picture is:
+
+**Compiles and passes tests here:** the whole `src-tauri` crate (`cargo check`, `cargo clippy --all-targets`, `cargo test`), plus the entire TypeScript layer. The screen-capture path additionally type-checks against the real `x86_64-pc-windows-msvc` target.
+
+**Cannot be exercised here, still needs Windows:** real device audio capture (WASAPI loopback), system-wide global hotkeys, Windows Credential Manager, and `pnpm tauri build` producing an installer. These are written against the documented crate APIs and compile, but "compiles" is not "works against real hardware".
+
+**Screen capture is deliberately not hand-written Win32.** An earlier draft stubbed out a GDI `BitBlt` implementation; it was replaced with the `xcap` crate because a large block of `unsafe` FFI that cannot be compiled or run in this environment is exactly the kind of code that ships confidently broken. `xcap` also removes the last `cfg(windows)` block from this codebase, which is what makes a Linux `cargo check` meaningful coverage of the Windows build, and gets macOS/Linux support for free per §3.

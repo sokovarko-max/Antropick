@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useAppServices } from "@/services/runtime/AppServicesContext";
+import { useAppServices } from "@/services/runtime/appServicesContext";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useOverlayStore } from "@/stores/overlayStore";
 import { RealtimePipeline } from "@/services/session/RealtimePipeline";
 import { parseAnswerFormat } from "@/utils/parseAnswerFormat";
 import { estimateCostUsd } from "@/services/session/CostMonitor";
 import { OverlayPanel } from "@/components/OverlayPanel";
+import { captureScreenshot } from "@/services/capture/screenshot";
+import { useDesktopHotkeys } from "@/services/runtime/useDesktopHotkeys";
 import type { AIResponseRecord, TranscriptSegment } from "@/types";
 
 export function InterviewLivePage() {
@@ -57,7 +59,7 @@ export function InterviewLivePage() {
 
   useEffect(() => {
     if (!session) return;
-    const sessionChunks = documentChunks[session.id] ?? documentChunks["pending"] ?? [];
+    const sessionChunks = documentChunks[session.id] ?? [];
     pipeline?.setDocumentChunks(
       sessionChunks.filter((c) => c.docType === "RESUME"),
       sessionChunks.filter((c) => c.docType === "JOB_DESCRIPTION"),
@@ -94,6 +96,34 @@ export function InterviewLivePage() {
     navigate(`/sessions/${sessionId}`);
   }
 
+  /** Ctrl+B: capture the screen, send it to the vision model, show the answer. */
+  async function handleScreenshot() {
+    if (!session) return;
+    overlay.setQuestion("Screenshot");
+    try {
+      const screenshot = await captureScreenshot();
+      overlay.setQuestion(`Screenshot — ${screenshot.source}`);
+      const answer = await services.visionService.analyze({
+        imageBase64: screenshot.base64,
+        mediaType: "image/png",
+        recentTranscript: pipelineRef.current?.transcript.recentWindow(60_000) ?? [],
+      });
+      const parsed = parseAnswerFormat(answer);
+      overlay.setAnswer(parsed.answer, parsed.keyPoints);
+    } catch (error) {
+      overlay.setError(
+        error instanceof Error ? error.message : "Screenshot analysis failed",
+      );
+    }
+  }
+
+  useDesktopHotkeys({
+    onAskAi: () => void pipelineRef.current?.respondToLatest(),
+    onScreenshot: () => void handleScreenshot(),
+    onPause: () => overlay.togglePause(),
+    onHide: () => overlay.setVisible(!overlay.isVisible),
+  });
+
   if (!session) {
     return <p className="text-sm text-ink-muted">Session not found.</p>;
   }
@@ -122,7 +152,7 @@ export function InterviewLivePage() {
 
       <OverlayPanel
         onAskAi={() => void pipelineRef.current?.respondToLatest()}
-        onScreenshot={() => overlay.setError("Screenshot capture requires the desktop build (Ctrl+B) — not available in the browser dev server.")}
+        onScreenshot={() => void handleScreenshot()}
         onTogglePause={() => overlay.togglePause()}
         onHide={() => overlay.setVisible(!overlay.isVisible)}
       />

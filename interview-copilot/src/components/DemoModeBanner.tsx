@@ -1,4 +1,4 @@
-import { useAppServices } from "@/services/runtime/AppServicesContext";
+import { useAppServices } from "@/services/runtime/appServicesContext";
 import { t } from "@/i18n";
 
 export function DemoModeBanner() {

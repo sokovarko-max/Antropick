@@ -13,7 +13,16 @@ module.exports = {
   ignorePatterns: ["dist", "src-tauri", "node_modules", "*.config.*"],
   rules: {
     "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
-    "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
+    "@typescript-eslint/no-unused-vars": [
+      "error",
+      {
+        argsIgnorePattern: "^_",
+        varsIgnorePattern: "^_",
+        // `const { omitted: _omitted, ...rest } = obj` is the idiomatic way to
+        // drop a property; the discarded binding is the point, not a mistake.
+        ignoreRestSiblings: true,
+      },
+    ],
     "@typescript-eslint/no-explicit-any": "error",
   },
 };

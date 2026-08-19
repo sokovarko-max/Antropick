@@ -18,12 +18,22 @@ pnpm test:watch         # vitest watch mode
 pnpm lint                # eslint
 pnpm format               # prettier --write
 
-# Rust (requires webkit2gtk dev headers on Linux, or run on Windows):
-pnpm tauri dev            # full desktop app with Rust backend
-pnpm tauri build           # production Windows build/installer (must run on Windows or windows-latest CI)
-cd src-tauri && cargo test  # Rust unit tests
+# Rust — these DO run on Linux once the system libraries below are present:
+cd src-tauri && cargo check
 cd src-tauri && cargo clippy --all-targets
+cd src-tauri && cargo test          # DSP unit tests in src/audio/vad.rs
+
+pnpm tauri dev              # full desktop app (needs a display; not usable headless)
+pnpm tauri build             # production Windows build/installer — Windows or windows-latest CI only
 ```
+
+### System libraries needed to compile `src-tauri` on Linux
+```bash
+apt-get install -y libwebkit2gtk-4.1-dev libjavascriptcoregtk-4.1-dev libsoup-3.0-dev \
+                   libwayland-dev libxcb1-dev libxrandr-dev libdbus-1-dev \
+                   libpipewire-0.3-dev libasound2-dev libgbm-dev libclang-dev
+```
+webkit2gtk/soup are Tauri's; pipewire/gbm/wayland/xcb are `xcap`'s (screen capture); alsa is `cpal`'s (audio). All are Linux-only — none apply to the Windows build.
 
 ## Coding rules
 - Strict TypeScript everywhere in `src/`; no `any` in `src/services/**` — use `unknown` + narrowing or a Zod schema.
@@ -47,5 +57,18 @@ cd src-tauri && cargo clippy --all-targets
 - Commit style: `feat: ...`, `fix: ...`, `docs: ...`, `test: ...`, small and scoped to one phase/step at a time (see `docs/requirements.md` for phase boundaries).
 - `DEMO_MODE=true` must keep the entire UI usable with mock AI/STT and no API key — do not let a feature hard-depend on a live key without a demo-mode fallback.
 
-## Known environment limitation (read before "fixing" a Rust/Tauri build failure here)
-This container has no `webkit2gtk` dev headers, so Tauri cannot compile here even for a Windows target check, and there is no Windows machine, audio hardware, or Anthropic API key available. `src-tauri/` is written to the correct Rust crate APIs but is **unverified by compilation** in this environment. Do not spend time trying to make `cargo check`/`tauri build` pass here — install the missing system packages on a real dev machine (or Windows CI) instead. The frontend (`src/`) has no such limitation and must build/test/lint clean.
+## Verification status — what is actually proven vs. still assumed
+
+**Verified in CI-like conditions (Linux container, no Windows, no hardware, no API key):**
+- Frontend: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all clean.
+- Rust: `cargo check`, `cargo clippy --all-targets`, and `cargo test` all clean — the crate compiles and its DSP tests pass. `cargo check --target x86_64-pc-windows-msvc` also type-checks the screen-capture path against the real Windows target (the full Windows check needs an MSVC toolchain for bundled SQLite's C code, which this container lacks).
+- Demo mode drives the whole UI end to end in a headless browser, including session history surviving a reload.
+
+**Still unproven — needs a real Windows machine:**
+- Microphone / system-audio (WASAPI loopback) capture against real devices.
+- Global hotkeys actually firing system-wide.
+- Windows Credential Manager round-trip for the API key.
+- `pnpm tauri build` producing and running a signed installer.
+- Any call against the real Anthropic API (no key here), so latency targets in `docs/requirements.md` are still design targets, not measurements.
+
+Keep this section honest: if you verify one of these, move it up; if you add something unverifiable here, add it below.

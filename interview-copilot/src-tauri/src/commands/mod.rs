@@ -4,7 +4,14 @@
 
 use crate::{audio, capture, database::Database, security};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::Mutex;
 use tauri::{AppHandle, State};
+
+/// Live capture threads, keyed by channel. Managed by Tauri so `stop` can
+/// reach the handle that `start` created — dropping a handle also stops it.
+#[derive(Default)]
+pub struct AudioCaptureState(pub Mutex<HashMap<String, audio::AudioCaptureHandle>>);
 
 #[tauri::command]
 pub fn secure_store_set(key: String, value: String) -> Result<(), String> {
@@ -35,26 +42,38 @@ pub fn list_audio_devices() -> Result<Vec<audio::AudioDeviceInfo>, String> {
 }
 
 #[tauri::command]
-pub fn start_audio_capture(app: AppHandle, channel: String) -> Result<(), String> {
+pub fn start_audio_capture(
+    app: AppHandle,
+    state: State<AudioCaptureState>,
+    channel: String,
+) -> Result<(), String> {
     let channel_static: &'static str = match channel.as_str() {
         "microphone" => "microphone",
         "system" => "system",
         other => return Err(format!("unknown audio channel: {other}")),
     };
 
-    audio::start_capture(channel_static, move |chunk| {
+    let mut handles = state.0.lock().map_err(|_| "audio state lock poisoned")?;
+    if handles.contains_key(channel_static) {
+        return Err(format!("{channel_static} capture is already running"));
+    }
+
+    let handle = audio::start_capture(channel_static, move |chunk| {
         use tauri::Emitter;
         let _ = app.emit("audio-chunk", &chunk);
     })
-    .map(|_handle| ())
-    .map_err(|e| e.to_string())
+    .map_err(|e| e.to_string())?;
+
+    handles.insert(channel_static.to_string(), handle);
+    Ok(())
 }
 
 #[tauri::command]
-pub fn stop_audio_capture() -> Result<(), String> {
-    // NOTE: a real implementation tracks AudioCaptureHandle per channel in
-    // managed Tauri state and calls .stop() on it here; omitted in this
-    // scaffold pass, tracked as a follow-up (docs/architecture.md §9).
+pub fn stop_audio_capture(state: State<AudioCaptureState>, channel: String) -> Result<(), String> {
+    let mut handles = state.0.lock().map_err(|_| "audio state lock poisoned")?;
+    if let Some(mut handle) = handles.remove(&channel) {
+        handle.stop();
+    }
     Ok(())
 }
 

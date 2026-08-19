@@ -1,9 +1,8 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { buildAppServices, type AppServices } from "./AppServices";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { buildAppServices } from "./AppServices";
+import { AppServicesContext } from "./appServicesContext";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { ANTHROPIC_API_KEY_STORAGE_KEY, secureStoreGet } from "@/services/security/secureStore";
-
-const AppServicesContext = createContext<AppServices | null>(null);
 
 export function AppServicesProvider({ children }: { children: ReactNode }) {
   const demoMode = useSettingsStore((s) => s.demoMode);
@@ -35,8 +34,3 @@ export function AppServicesProvider({ children }: { children: ReactNode }) {
   return <AppServicesContext.Provider value={services}>{children}</AppServicesContext.Provider>;
 }
 
-export function useAppServices(): AppServices {
-  const services = useContext(AppServicesContext);
-  if (!services) throw new Error("useAppServices must be used within AppServicesProvider");
-  return services;
-}

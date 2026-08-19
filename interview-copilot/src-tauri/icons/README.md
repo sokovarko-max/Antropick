@@ -1,1 +1,9 @@
-Real icon assets (32x32.png, 128x128.png, 128x128@2x.png, icon.ico, icon.png) are not included in this scaffold — generate them from a source image with `pnpm tauri icon <path-to-source.png>` on a machine with the Tauri CLI's icon pipeline available (this container has no image-processing toolchain wired up for it). `tauri.conf.json` references these filenames; a real build will fail until they exist.
+Icons are generated from `app-icon.png` (the 1024×1024 source, kept here) with:
+
+```
+pnpm tauri icon src-tauri/icons/app-icon.png
+```
+
+Re-run that after changing the source. The Android/iOS output the generator
+also produces is deleted — this project targets Windows desktop first (see
+docs/architecture.md §3), so those sets would be dead weight in the repo.

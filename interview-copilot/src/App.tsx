@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { NavSidebar } from "@/components/NavSidebar";
 import { DemoModeBanner } from "@/components/DemoModeBanner";
@@ -11,10 +12,19 @@ import { SettingsPage } from "@/pages/SettingsPage";
 import { OnboardingPage } from "@/pages/OnboardingPage";
 import { OverlayWindowPage } from "@/pages/OverlayWindowPage";
 import { useSettingsStore } from "@/stores/settingsStore";
+import { useSessionStore } from "@/stores/sessionStore";
 
 export default function App() {
   const location = useLocation();
   const hasCompletedOnboarding = useSettingsStore((s) => s.hasCompletedOnboarding);
+  const hydrate = useSessionStore((s) => s.hydrate);
+  const isHydrated = useSessionStore((s) => s.isHydrated);
+
+  // Session history lives on disk (SQLite in the desktop build), so it has to
+  // be read back before the first render that shows it.
+  useEffect(() => {
+    void hydrate();
+  }, [hydrate]);
 
   // The Tauri "overlay" window loads this same SPA at #/overlay — it must
   // never be gated by onboarding or wrapped in the main app shell.
@@ -24,6 +34,14 @@ export default function App() {
 
   if (!hasCompletedOnboarding) {
     return <OnboardingPage />;
+  }
+
+  if (!isHydrated) {
+    return (
+      <div className="flex h-screen items-center justify-center text-sm text-ink-muted">
+        Loading…
+      </div>
+    );
   }
 
   return (

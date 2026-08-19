@@ -11,7 +11,10 @@ pub const EVENT_SCREENSHOT: &str = "hotkey:screenshot";
 pub const EVENT_HIDE: &str = "hotkey:hide";
 pub const EVENT_PAUSE: &str = "hotkey:pause";
 
-pub fn register_default_hotkeys(app: &AppHandle) -> tauri::Result<()> {
+/// Returns a boxed error rather than `tauri::Result` because the
+/// global-shortcut plugin has its own error type that does not convert into
+/// `tauri::Error`; `setup` accepts `Box<dyn Error>` directly.
+pub fn register_default_hotkeys(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let bindings: [(Shortcut, &'static str); 4] = [
         (
             Shortcut::new(Some(Modifiers::CONTROL), Code::KeyQ),
