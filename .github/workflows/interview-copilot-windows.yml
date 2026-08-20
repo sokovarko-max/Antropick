@@ -1,0 +1,72 @@
+name: Interview Copilot (Windows)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'interview-copilot/**'
+      - '.github/workflows/interview-copilot-windows.yml'
+  pull_request:
+    paths:
+      - 'interview-copilot/**'
+      - '.github/workflows/interview-copilot-windows.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: interview-copilot
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Установить pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Установить Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: interview-copilot/pnpm-lock.yaml
+
+      - name: Установить Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Кэш Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: interview-copilot/src-tauri
+
+      - name: Установить зависимости
+        run: pnpm install --frozen-lockfile
+
+      # Проверки идут до сборки: если они падают, установщик собирать незачем.
+      - name: Проверка типов
+        run: pnpm typecheck
+
+      - name: Линтер
+        run: pnpm lint
+
+      - name: Тесты фронтенда
+        run: pnpm test
+
+      - name: Тесты Rust
+        working-directory: interview-copilot/src-tauri
+        run: cargo test
+
+      - name: Сборка установщика
+        run: pnpm tauri build
+
+      # Путь считается от корня репозитория, а не от working-directory.
+      - name: Выложить установщик артефактом
+        uses: actions/upload-artifact@v4
+        with:
+          name: InterviewCopilot-Setup
+          path: interview-copilot/src-tauri/target/release/bundle/nsis/*.exe
+          if-no-files-found: error
+          retention-days: 30

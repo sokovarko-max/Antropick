@@ -70,12 +70,41 @@ Network calls are always mocked in unit tests; nothing hits the real Anthropic A
 
 ## Building & packaging
 
+There is no pre-built installer to download — the app has to be built once, and a Windows installer can only be produced on Windows.
+
+### Option A — let GitHub build it (no local toolchain)
+
+`.github/workflows/interview-copilot-windows.yml` builds on a `windows-latest` runner and publishes the installer as a workflow artifact:
+
+1. GitHub → **Actions** → **Interview Copilot (Windows)** → **Run workflow**
+2. Wait for the run (roughly 15–25 minutes the first time; the Rust cache makes later runs much faster)
+3. Open the finished run → **Artifacts** → download **InterviewCopilot-Setup**
+4. Unzip it and run the `.exe` inside
+
+The workflow runs typecheck, lint, and both test suites before building, so a red run means something is actually broken rather than the artifact being missing.
+
+### Option B — build locally on Windows
+
+Needs [Node 20+](https://nodejs.org), [pnpm](https://pnpm.io/installation), [Rust](https://rustup.rs), and **Visual Studio Build Tools** with the "Desktop development with C++" workload (the MSVC linker is required — Rust cannot link a Windows binary without it). WebView2 ships with Windows 11 already.
+
 ```bash
-pnpm build         # frontend bundle
-pnpm tauri build   # Windows installer (.exe via NSIS) — must run on Windows or windows-latest CI
+git clone https://github.com/sokovarko-max/Antropick.git
+cd Antropick/interview-copilot
+pnpm install
+pnpm tauri build
 ```
 
+The installer lands in `src-tauri/target/release/bundle/nsis/`.
+
+### Installing the result
+
+The installer is **unsigned**, so SmartScreen will warn on first run — "More info" → "Run anyway". It installs per-user (no admin prompt) and creates Start Menu and Desktop shortcuts. Uninstall through Settings → Apps as usual.
+
 App icons are generated from `src-tauri/icons/app-icon.png` with `pnpm tauri icon <source>`.
+
+### First run
+
+The app opens in **demo mode** with mock AI responses, so it is usable immediately without a key. For real suggestions, add an [Anthropic API key](https://console.anthropic.com/settings/keys) in **Settings → AI → Test Connection**, then turn demo mode off in **Settings → General**. The key goes into Windows Credential Manager, never into a file in the repo.
 
 ## Architecture
 
