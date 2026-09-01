@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { buildAppServices } from "./AppServices";
-import { AppServicesContext } from "./appServicesContext";
+import { AppServicesContext } from "./useAppServices";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { ANTHROPIC_API_KEY_STORAGE_KEY, secureStoreGet } from "@/services/security/secureStore";
 

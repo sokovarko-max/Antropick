@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useSessionStore } from "@/stores/sessionStore";
-import { useAppServices } from "@/services/runtime/appServicesContext";
+import { useAppServices } from "@/services/runtime/useAppServices";
 import { t } from "@/i18n";
 import type { ScoreCategory } from "@/types";
 

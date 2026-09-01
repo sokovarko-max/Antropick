@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useAppServices } from "@/services/runtime/appServicesContext";
+import { useAppServices } from "@/services/runtime/useAppServices";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useOverlayStore } from "@/stores/overlayStore";
 import { RealtimePipeline } from "@/services/session/RealtimePipeline";
