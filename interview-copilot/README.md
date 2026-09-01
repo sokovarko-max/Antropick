@@ -10,7 +10,7 @@ Built with Tauri 2 (Rust backend) + React/TypeScript. Windows first; the archite
 
 - **Node** 20+ and **pnpm** 9+
 - **Rust** stable (only needed for the desktop build, not the browser dev server)
-- **Windows 11** for the real desktop app; Linux/macOS work for frontend development
+- **Windows 10 (64-bit, version 1809+) or Windows 11** for the real desktop app; Linux/macOS work for frontend development. Nothing in this codebase is actually Windows-11-only — see the note under Installing the result below for the one thing that differs on Windows 10 (WebView2).
 - An **Anthropic API key** for real AI responses — optional, demo mode needs none
 
 ## Installation
@@ -85,7 +85,7 @@ The workflow runs typecheck, lint, and both test suites before building, so a re
 
 ### Option B — build locally on Windows
 
-Needs [Node 20+](https://nodejs.org), [pnpm](https://pnpm.io/installation), [Rust](https://rustup.rs), and **Visual Studio Build Tools** with the "Desktop development with C++" workload (the MSVC linker is required — Rust cannot link a Windows binary without it). WebView2 ships with Windows 11 already.
+Needs [Node 20+](https://nodejs.org), [pnpm](https://pnpm.io/installation), [Rust](https://rustup.rs), and **Visual Studio Build Tools** with the "Desktop development with C++" workload (the MSVC linker is required — Rust cannot link a Windows binary without it). The *build* machine's OS doesn't matter for this — only the OS the installer will later run on (see WebView2 note below).
 
 ```bash
 git clone https://github.com/sokovarko-max/Antropick.git
@@ -99,6 +99,8 @@ The installer lands in `src-tauri/target/release/bundle/nsis/`.
 ### Installing the result
 
 The installer is **unsigned**, so SmartScreen will warn on first run — "More info" → "Run anyway". It installs per-user (no admin prompt) and creates Start Menu and Desktop shortcuts. Uninstall through Settings → Apps as usual.
+
+**Windows 10 note (WebView2):** the app's UI renders inside Microsoft's WebView2 runtime. Windows 11 has it preinstalled; most Windows 10 machines already have it too (it's been pushed via Windows Update since mid-2022), but if yours doesn't, the NSIS installer detects that automatically and downloads the small (~2 MB) WebView2 bootstrapper during setup — no separate action needed, just an internet connection at install time. If you want to confirm or install it yourself first, grab the "Evergreen Bootstrapper" from https://developer.microsoft.com/microsoft-edge/webview2/.
 
 App icons are generated from `src-tauri/icons/app-icon.png` with `pnpm tauri icon <source>`.
 
