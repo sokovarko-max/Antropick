@@ -11,7 +11,7 @@ Built with Tauri 2 (Rust backend) + React/TypeScript. Windows first; the archite
 - **Node** 20+ and **pnpm** 9+
 - **Rust** stable (only needed for the desktop build, not the browser dev server)
 - **Windows 10 (64-bit, version 1809+) or Windows 11** for the real desktop app; Linux/macOS work for frontend development. Nothing in this codebase is actually Windows-11-only — see the note under Installing the result below for the one thing that differs on Windows 10 (WebView2).
-- An **Anthropic API key** for real AI responses — optional, demo mode needs none
+- An **API key** for real AI responses — Groq has a free tier (no card); Anthropic is paid. Optional either way: demo mode needs none.
 
 ## Installation
 
@@ -20,7 +20,7 @@ pnpm install
 cp .env.example .env      # optional; the API key itself is NOT stored here
 ```
 
-The Anthropic key is never read from `.env` in a real build. It goes into OS secure storage (Windows Credential Manager) via **Settings → AI → Test Connection**. See [docs/security.md](docs/security.md).
+API keys are never read from `.env` in a real build. They go into OS secure storage (Windows Credential Manager) via **Settings → AI → Test Connection**, one key per provider. See [docs/security.md](docs/security.md).
 
 ## Development
 
@@ -54,19 +54,19 @@ None of these apply to the Windows build — they're the Linux backends for WebK
 | `STT_API_KEY` | Speech-to-text vendor key |
 | `DATABASE_PATH` | Override the SQLite location (defaults to the OS app-data dir) |
 
-`ANTHROPIC_API_KEY` exists in the example file for local experiments only — production reads the key from secure storage, never from env.
+`ANTHROPIC_API_KEY` / `GROQ_API_KEY` exist in the example file for local experiments only — production reads keys from secure storage, never from env.
 
 ## Testing
 
 ```bash
-pnpm test                    # Vitest — 77 unit tests over the service layer
+pnpm test                    # Vitest — 107 unit tests over the service layer
 pnpm typecheck               # tsc --noEmit, strict
 pnpm lint                    # ESLint
 cd src-tauri && cargo test   # Rust — 12 DSP tests (VAD + chunking)
 cd src-tauri && cargo clippy --all-targets
 ```
 
-Network calls are always mocked in unit tests; nothing hits the real Anthropic API.
+Network calls are always mocked in unit tests; nothing hits a real vendor API.
 
 ## Building & packaging
 
@@ -106,7 +106,23 @@ App icons are generated from `src-tauri/icons/app-icon.png` with `pnpm tauri ico
 
 ### First run
 
-The app opens in **demo mode** with mock AI responses, so it is usable immediately without a key. For real suggestions, add an [Anthropic API key](https://console.anthropic.com/settings/keys) in **Settings → AI → Test Connection**, then turn demo mode off in **Settings → General**. The key goes into Windows Credential Manager, never into a file in the repo.
+The app opens in **demo mode** with mock AI responses, so it is usable immediately without a key. For real suggestions, pick a provider in **Settings → AI**, paste a key, press **Test Connection**, then turn demo mode off in **Settings → General**. Keys go into Windows Credential Manager, never into a file in the repo.
+
+## Choosing a provider
+
+| | [Groq](https://console.groq.com/keys) | [Anthropic](https://console.anthropic.com/settings/keys) |
+|---|---|---|
+| Cost | Free tier, no credit card | Paid per token (an hour-long interview is typically well under $1) |
+| Limits | 30 requests/min | Billing balance |
+| Speed | Fastest available — matters most for live suggestions | Fast enough |
+| Answer quality | Good | Better |
+| Screenshot analysis (Ctrl+B) | Works, but on a preview-tier model | Production-grade |
+
+Groq is the default because live suggestions are latency-bound, and a free tier removes the biggest barrier to trying the app at all. Both providers are wired through the same `AIProvider` interface, so switching is a dropdown.
+
+Anything speaking OpenAI's `/chat/completions` works through the same code path — OpenRouter, LM Studio, or a local Ollama only need a base URL added to `PROVIDERS` in `src/config/models.ts`.
+
+**A note on local models:** running the model on your own machine is appealing but does not work for the *live* suggestions on typical laptop hardware. Without a discrete GPU a 7–8B model produces 4–8 tokens/sec, so a short answer takes 20–35 seconds — long past the moment it was needed. Local models are viable for the post-interview analysis, where waiting a minute is fine.
 
 ## Architecture
 
@@ -129,9 +145,9 @@ Full detail: [architecture](docs/architecture.md) · [data flow](docs/data-flow.
 
 ## Verification status
 
-**Proven** (runs clean in a Linux container with no Windows, no hardware, no API key): the full TypeScript layer builds, lints, and passes 77 tests; the entire Rust crate passes `cargo check`, `clippy`, and 12 tests; the screen-capture path also type-checks against `x86_64-pc-windows-msvc`; and demo mode drives onboarding → session → transcript → history in a headless browser with session history surviving a reload.
+**Proven** (runs clean in a Linux container with no Windows, no hardware, no API key): the full TypeScript layer builds, lints, and passes 107 tests; the entire Rust crate passes `cargo check`, `clippy`, and 12 tests; the screen-capture path also type-checks against `x86_64-pc-windows-msvc`; and demo mode drives onboarding → session → transcript → history in a headless browser with session history surviving a reload.
 
-**Unproven, needs real Windows**: device audio capture, system-wide hotkeys, Credential Manager round-trip, installer build, and any real Anthropic call — so the sub-3s latency goal is a design target, not a measurement.
+**Unproven, needs real Windows**: device audio capture, system-wide hotkeys, Credential Manager round-trip, installer build, and any real call to a provider — so the sub-3s latency goal is a design target, not a measurement.
 
 ## Troubleshooting
 

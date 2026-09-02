@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useSettingsStore } from "@/stores/settingsStore";
-import { AnthropicProvider } from "@/services/ai/AnthropicProvider";
+import { createAIProvider } from "@/services/runtime/AppServices";
 import { AIProviderError, type AIErrorCode } from "@/services/ai/types";
-import { ANTHROPIC_API_KEY_STORAGE_KEY, secureStoreSet } from "@/services/security/secureStore";
+import { apiKeyStorageKey, secureStoreSet } from "@/services/security/secureStore";
+import { MODEL_PROFILES, PROVIDERS, type ProviderId } from "@/config/models";
 import { OverlayPanel } from "@/components/OverlayPanel";
 import { useTranslation } from "@/i18n/useTranslation";
 import type { TranslationKey } from "@/i18n";
@@ -26,8 +27,8 @@ export function SettingsPage() {
     setConnectionError(null);
     settings.setConnectionStatus("UNKNOWN");
     try {
-      await secureStoreSet(ANTHROPIC_API_KEY_STORAGE_KEY, apiKeyInput);
-      const provider = new AnthropicProvider({ apiKey: apiKeyInput });
+      await secureStoreSet(apiKeyStorageKey(settings.aiProvider), apiKeyInput);
+      const provider = createAIProvider(settings.aiProvider, apiKeyInput);
       await provider.generate({
         taskType: "CHAT",
         systemPrompt: "Reply with exactly: OK",
@@ -35,7 +36,7 @@ export function SettingsPage() {
         maxTokens: 5,
       });
       settings.setConnectionStatus("CONNECTED");
-      settings.setAnthropicApiKeyPresent(true);
+      settings.setApiKeyPresent(settings.aiProvider, true);
     } catch (error) {
       // Surface the real reason — a silent "not connected" with no detail is
       // exactly what let a real bug (SDK refusing to run in a WebView) go
@@ -106,13 +107,37 @@ export function SettingsPage() {
         {section === "ai" && (
           <div className="space-y-4">
             <label className="block space-y-1.5">
+              <span className="text-sm font-medium text-ink-muted">{t("settings.ai.provider")}</span>
+              <select
+                value={settings.aiProvider}
+                onChange={(e) => {
+                  settings.setAiProvider(e.target.value as ProviderId);
+                  setApiKeyInput("");
+                  setConnectionError(null);
+                }}
+                className="input"
+              >
+                {Object.values(PROVIDERS).map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <p className="text-xs text-ink-faint">
+              {t(`settings.ai.hint.${settings.aiProvider}` as TranslationKey)}{" "}
+              <span className="text-ink-muted">{PROVIDERS[settings.aiProvider].consoleUrl}</span>
+            </p>
+
+            <label className="block space-y-1.5">
               <span className="text-sm font-medium text-ink-muted">{t("settings.ai.apiKey")}</span>
               <input
                 type="password"
                 value={apiKeyInput}
                 onChange={(e) => setApiKeyInput(e.target.value)}
                 className="input"
-                placeholder="sk-ant-..."
+                placeholder={settings.aiProvider === "groq" ? "gsk_..." : "sk-ant-..."}
               />
             </label>
             <div className="flex items-center gap-3">
@@ -121,7 +146,7 @@ export function SettingsPage() {
                 disabled={testing || !apiKeyInput}
                 className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-50"
               >
-                {testing ? "Testing…" : t("settings.ai.testConnection")}
+                {testing ? t("settings.ai.testing") : t("settings.ai.testConnection")}
               </button>
               <span
                 className={`text-sm ${
@@ -146,10 +171,22 @@ export function SettingsPage() {
                 </details>
               </div>
             )}
-            <p className="text-xs text-ink-faint">
-              The key is stored in OS secure storage only — never in the database or a plain settings
-              file. See docs/security.md.
-            </p>
+            <div className="space-y-1 rounded-lg border border-surface-border p-3">
+              <p className="text-xs font-medium text-ink-muted">{t("settings.ai.modelsInUse")}</p>
+              {(
+                Object.entries(MODEL_PROFILES[settings.aiProvider]) as [string, { modelId: string }][]
+              ).map(([task, profile]) => (
+                <div key={task} className="flex justify-between text-xs">
+                  <span className="text-ink-faint">{task}</span>
+                  <span className="font-mono text-ink-muted">{profile.modelId}</span>
+                </div>
+              ))}
+              {settings.aiProvider === "groq" && (
+                <p className="pt-1 text-xs text-state-thinking">{t("settings.ai.groqVisionPreview")}</p>
+              )}
+            </div>
+
+            <p className="text-xs text-ink-faint">{t("settings.ai.keyStorageNote")}</p>
           </div>
         )}
 

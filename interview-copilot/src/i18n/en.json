@@ -72,5 +72,12 @@
   "aiError.SERVER_ERROR": "The Anthropic API is having trouble right now. Try again shortly.",
   "aiError.NETWORK_ERROR": "Could not reach the Anthropic API. Check the internet connection, and any VPN or firewall.",
   "aiError.UNKNOWN": "The request failed.",
-  "aiError.details": "Technical details"
+  "aiError.details": "Technical details",
+  "settings.ai.provider": "AI provider",
+  "settings.ai.testing": "Testing…",
+  "settings.ai.modelsInUse": "Models in use",
+  "settings.ai.keyStorageNote": "The key is stored in OS secure storage only — never in the database or a plain settings file.",
+  "settings.ai.hint.anthropic": "Paid per token, no free tier. An hour-long interview typically costs well under $1. Get a key at",
+  "settings.ai.hint.groq": "Free tier, no credit card: 30 requests/min. Fastest responses of the options here. Get a key at",
+  "settings.ai.groqVisionPreview": "Note: Groq serves the vision model as preview-tier, so Ctrl+B screenshot analysis may be less reliable than the text features."
 }

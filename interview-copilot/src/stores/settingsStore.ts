@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { InterviewFramework, ResponseMode } from "@/types";
+import type { ProviderId } from "@/config/models";
 import type { Locale } from "@/i18n";
 
 export interface HotkeyBindings {
@@ -25,8 +26,10 @@ export interface CostLimitSettings {
 
 export interface SettingsState {
   demoMode: boolean;
-  /** Whether an Anthropic key exists in secure storage — never the key itself. */
-  anthropicApiKeyPresent: boolean;
+  /** Which vendor the app talks to. */
+  aiProvider: ProviderId;
+  /** Which providers have a key in secure storage — never the keys themselves. */
+  apiKeyPresent: Record<ProviderId, boolean>;
   connectionStatus: "UNKNOWN" | "CONNECTED" | "DISCONNECTED";
   locale: Locale;
   responseMode: ResponseMode;
@@ -39,7 +42,8 @@ export interface SettingsState {
   hasCompletedOnboarding: boolean;
 
   setDemoMode: (value: boolean) => void;
-  setAnthropicApiKeyPresent: (value: boolean) => void;
+  setAiProvider: (provider: ProviderId) => void;
+  setApiKeyPresent: (provider: ProviderId, value: boolean) => void;
   setConnectionStatus: (status: SettingsState["connectionStatus"]) => void;
   setLocale: (locale: Locale) => void;
   setResponseMode: (mode: ResponseMode) => void;
@@ -55,7 +59,8 @@ export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
       demoMode: true,
-      anthropicApiKeyPresent: false,
+      aiProvider: "groq",
+      apiKeyPresent: { anthropic: false, groq: false },
       connectionStatus: "UNKNOWN",
       locale: "en",
       responseMode: "SHORT",
@@ -77,7 +82,9 @@ export const useSettingsStore = create<SettingsState>()(
       hasCompletedOnboarding: false,
 
       setDemoMode: (value) => set({ demoMode: value }),
-      setAnthropicApiKeyPresent: (value) => set({ anthropicApiKeyPresent: value }),
+      setAiProvider: (provider) => set({ aiProvider: provider, connectionStatus: "UNKNOWN" }),
+      setApiKeyPresent: (provider, value) =>
+        set((s) => ({ apiKeyPresent: { ...s.apiKeyPresent, [provider]: value } })),
       setConnectionStatus: (status) => set({ connectionStatus: status }),
       setLocale: (locale) => set({ locale }),
       setResponseMode: (mode) => set({ responseMode: mode }),

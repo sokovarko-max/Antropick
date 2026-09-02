@@ -1,3 +1,5 @@
+import { PROVIDERS, type ProviderId } from "@/config/models";
+
 /**
  * Frontend wrapper around the Rust secure_store_* Tauri commands (see
  * src-tauri/src/commands/mod.rs, src-tauri/src/security/mod.rs). The real
@@ -42,4 +44,9 @@ export async function secureStoreDelete(key: string): Promise<void> {
   devOnlyMemoryStore.delete(key);
 }
 
-export const ANTHROPIC_API_KEY_STORAGE_KEY = "anthropic_api_key";
+/** Each provider keeps its own key, so switching back does not require re-entry. */
+export function apiKeyStorageKey(providerId: ProviderId): string {
+  return PROVIDERS[providerId].secureStorageKey;
+}
+
+export const ANTHROPIC_API_KEY_STORAGE_KEY = PROVIDERS.anthropic.secureStorageKey;
