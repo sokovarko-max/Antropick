@@ -12,9 +12,11 @@ export function SettingsPage() {
   const settings = useSettingsStore();
   const [apiKeyInput, setApiKeyInput] = useState("");
   const [testing, setTesting] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
 
   async function handleTestConnection() {
     setTesting(true);
+    setConnectionError(null);
     settings.setConnectionStatus("UNKNOWN");
     try {
       await secureStoreSet(ANTHROPIC_API_KEY_STORAGE_KEY, apiKeyInput);
@@ -27,8 +29,12 @@ export function SettingsPage() {
       });
       settings.setConnectionStatus("CONNECTED");
       settings.setAnthropicApiKeyPresent(true);
-    } catch {
+    } catch (error) {
+      // Surface the real reason — a silent "not connected" with no detail is
+      // exactly what let a real bug (SDK refusing to run in a WebView) go
+      // unnoticed. See docs/security.md: no silent failures.
       settings.setConnectionStatus("DISCONNECTED");
+      setConnectionError(error instanceof Error ? error.message : String(error));
     } finally {
       setTesting(false);
     }
@@ -112,6 +118,11 @@ export function SettingsPage() {
                     : ""}
               </span>
             </div>
+            {connectionError && (
+              <p className="rounded-lg bg-state-error/10 px-3 py-2 text-sm text-state-error">
+                {connectionError}
+              </p>
+            )}
             <p className="text-xs text-ink-faint">
               The key is stored in OS secure storage only — never in the database or a plain settings
               file. See docs/security.md.

@@ -14,6 +14,17 @@ function fakeClient(overrides: Partial<Anthropic["messages"]> = {}): Anthropic {
 }
 
 describe("AnthropicProvider", () => {
+  // Regression test for a bug that shipped: every other test here injects a
+  // fake client, so the real SDK constructor was never exercised. The SDK
+  // refuses to start where `window`/`document`/`navigator` exist — which is
+  // true of both jsdom and Tauri's WebView — unless dangerouslyAllowBrowser
+  // is set. Without it, Test Connection failed for every key.
+  it("constructs a real SDK client in a browser-like environment", () => {
+    expect(typeof window).toBe("object");
+    expect(typeof window.document).toBe("object");
+    expect(() => new AnthropicProvider({ apiKey: "sk-ant-test" })).not.toThrow();
+  });
+
   it("generate() maps a text response and usage", async () => {
     const client = fakeClient({
       create: vi.fn().mockResolvedValue({

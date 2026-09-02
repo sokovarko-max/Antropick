@@ -24,7 +24,21 @@ export class AnthropicProvider implements AIProvider {
   private readonly client: Anthropic;
 
   constructor(options: AnthropicProviderOptions) {
-    this.client = options.client ?? new Anthropic({ apiKey: options.apiKey });
+    this.client =
+      options.client ??
+      new Anthropic({
+        apiKey: options.apiKey,
+        // The SDK refuses to run wherever `window`/`document` exist, since on
+        // a public web page that would expose the key to anyone inspecting
+        // network traffic. Tauri's renderer has those globals (it's a
+        // WebView) but is not a public page — it's the same trust boundary
+        // as the rest of this single-user desktop app, and the key never
+        // leaves this process except in the request to api.anthropic.com.
+        // Without this flag the constructor throws immediately and every
+        // call site (Settings > Test Connection, the realtime pipeline)
+        // fails with no useful message.
+        dangerouslyAllowBrowser: true,
+      });
   }
 
   async generate(request: AIGenerateRequest): Promise<AIResponse> {
