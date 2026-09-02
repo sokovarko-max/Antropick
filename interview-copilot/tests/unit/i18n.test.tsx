@@ -82,3 +82,39 @@ describe("useTranslation", () => {
     expect(screen.getByTestId("label").textContent).toBe("Settings");
   });
 });
+
+describe("placeholder interpolation", () => {
+  it("substitutes named variables", () => {
+    const message = t("aiError.INSUFFICIENT_CREDITS", "en", {
+      provider: "Groq",
+      console: "https://console.groq.com/keys",
+    });
+    expect(message).toContain("Groq");
+    expect(message).toContain("https://console.groq.com/keys");
+    expect(message).not.toContain("{");
+  });
+
+  it("leaves an unknown placeholder visible rather than printing 'undefined'", () => {
+    expect(t("aiError.INSUFFICIENT_CREDITS", "en", {})).toContain("{provider}");
+  });
+
+  it("never names a specific vendor in shared error copy", () => {
+    // Regression: this copy was written for a single provider, so a Groq user
+    // was told to top up an Anthropic account and sent to the wrong console.
+    const shared = [
+      "aiError.INSUFFICIENT_CREDITS",
+      "aiError.INVALID_API_KEY",
+      "aiError.PERMISSION_DENIED",
+      "aiError.RATE_LIMITED",
+      "aiError.SERVER_ERROR",
+      "aiError.NETWORK_ERROR",
+    ] as const;
+
+    for (const locale of ["en", "ru"] as const) {
+      for (const key of shared) {
+        const raw = t(key, locale);
+        expect(raw, `${key} (${locale})`).not.toMatch(/anthropic|groq|claude/i);
+      }
+    }
+  });
+});

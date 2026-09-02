@@ -3,7 +3,7 @@ import { useSettingsStore } from "@/stores/settingsStore";
 import { t as translate, type Locale, type TranslationKey } from "./index";
 
 export interface Translation {
-  t: (key: TranslationKey) => string;
+  t: (key: TranslationKey, vars?: Record<string, string>) => string;
   locale: Locale;
 }
 
@@ -14,6 +14,9 @@ export interface Translation {
  */
 export function useTranslation(): Translation {
   const locale = useSettingsStore((s) => s.locale);
-  const t = useCallback((key: TranslationKey) => translate(key, locale), [locale]);
+  const t = useCallback(
+    (key: TranslationKey, vars?: Record<string, string>) => translate(key, locale, vars),
+    [locale],
+  );
   return { t, locale };
 }

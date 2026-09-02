@@ -163,7 +163,14 @@ export function SettingsPage() {
             {connectionError && (
               <div className="space-y-2 rounded-lg bg-state-error/10 px-3 py-2">
                 <p className="text-sm text-state-error">
-                  {t(`aiError.${connectionError.code}` as TranslationKey)}
+                  {t(`aiError.${connectionError.code}` as TranslationKey, {
+                    provider: PROVIDERS[settings.aiProvider].label,
+                    console: PROVIDERS[settings.aiProvider].consoleUrl,
+                  })}
+                  {settings.aiProvider === "anthropic" &&
+                    connectionError.code === "INSUFFICIENT_CREDITS" && (
+                      <> {t("aiError.anthropicBillingNote")}</>
+                    )}
                 </p>
                 <details className="text-xs text-ink-faint">
                   <summary className="cursor-pointer">{t("aiError.details")}</summary>

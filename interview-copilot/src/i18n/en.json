@@ -65,12 +65,12 @@
   "settings.general.demoMode": "Demo mode",
   "settings.general.demoModeHint": "Use mock AI/STT — no API key required",
   "settings.general.language": "Language",
-  "aiError.INSUFFICIENT_CREDITS": "The Anthropic account has no credits left. Top it up at console.anthropic.com → Plans & Billing. (API credits are separate from a Claude Pro/Max subscription.)",
-  "aiError.INVALID_API_KEY": "That API key was rejected. Check it was copied in full from console.anthropic.com → API Keys.",
-  "aiError.PERMISSION_DENIED": "This key is not allowed to use that model. Check the key's permissions in the Anthropic console.",
-  "aiError.RATE_LIMITED": "Too many requests — the API is rate-limiting. Wait a moment and try again.",
-  "aiError.SERVER_ERROR": "The Anthropic API is having trouble right now. Try again shortly.",
-  "aiError.NETWORK_ERROR": "Could not reach the Anthropic API. Check the internet connection, and any VPN or firewall.",
+  "aiError.INSUFFICIENT_CREDITS": "The {provider} account has no credits left. Top it up at {console}.",
+  "aiError.INVALID_API_KEY": "{provider} rejected that API key. Check it was copied in full from {console}.",
+  "aiError.PERMISSION_DENIED": "This key is not allowed to use that model. Check its permissions at {console}.",
+  "aiError.RATE_LIMITED": "Too many requests — {provider} is rate-limiting. Wait a moment and try again.",
+  "aiError.SERVER_ERROR": "{provider} is having trouble right now. Try again shortly.",
+  "aiError.NETWORK_ERROR": "Could not reach {provider}. Check the internet connection, and any VPN or firewall.",
   "aiError.UNKNOWN": "The request failed.",
   "aiError.details": "Technical details",
   "settings.ai.provider": "AI provider",
@@ -79,5 +79,6 @@
   "settings.ai.keyStorageNote": "The key is stored in OS secure storage only — never in the database or a plain settings file.",
   "settings.ai.hint.anthropic": "Paid per token, no free tier. An hour-long interview typically costs well under $1. Get a key at",
   "settings.ai.hint.groq": "Free tier, no credit card: 30 requests/min. Fastest responses of the options here. Get a key at",
-  "settings.ai.groqVisionPreview": "Note: Groq serves the vision model as preview-tier, so Ctrl+B screenshot analysis may be less reliable than the text features."
+  "settings.ai.groqVisionPreview": "Note: Groq serves the vision model as preview-tier, so Ctrl+B screenshot analysis may be less reliable than the text features.",
+  "aiError.anthropicBillingNote": "Note: API credits are billed separately from a Claude Pro/Max subscription."
 }

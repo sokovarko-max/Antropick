@@ -16,6 +16,14 @@ const DICTIONARIES: Record<Locale, Record<string, string>> = { en, ru };
  * `useTranslation()`, which reads the locale from the store and therefore
  * re-renders when it changes.
  */
-export function t(key: TranslationKey, locale: Locale): string {
-  return DICTIONARIES[locale][key] ?? DICTIONARIES.en[key] ?? key;
+export function t(
+  key: TranslationKey,
+  locale: Locale,
+  vars?: Record<string, string>,
+): string {
+  const template = DICTIONARIES[locale][key] ?? DICTIONARIES.en[key] ?? key;
+  if (!vars) return template;
+  // Vendor names and console URLs differ per provider, so error copy is
+  // written once with placeholders rather than duplicated per vendor.
+  return template.replace(/\{(\w+)\}/g, (match, name: string) => vars[name] ?? match);
 }

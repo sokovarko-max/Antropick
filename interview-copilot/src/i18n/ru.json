@@ -65,12 +65,12 @@
   "settings.general.demoMode": "Демо-режим",
   "settings.general.demoModeHint": "Использовать заглушки ИИ и распознавания — API-ключ не нужен",
   "settings.general.language": "Язык",
-  "aiError.INSUFFICIENT_CREDITS": "На балансе аккаунта Anthropic закончились средства. Пополните на console.anthropic.com → Plans & Billing. (Кредиты API оплачиваются отдельно от подписки Claude Pro/Max.)",
-  "aiError.INVALID_API_KEY": "API-ключ отклонён. Проверьте, что он скопирован целиком с console.anthropic.com → API Keys.",
-  "aiError.PERMISSION_DENIED": "У этого ключа нет доступа к выбранной модели. Проверьте права ключа в консоли Anthropic.",
-  "aiError.RATE_LIMITED": "Слишком много запросов — сработало ограничение частоты. Подождите немного и повторите.",
-  "aiError.SERVER_ERROR": "На стороне Anthropic сейчас неполадки. Попробуйте через некоторое время.",
-  "aiError.NETWORK_ERROR": "Не удалось связаться с Anthropic API. Проверьте интернет, VPN и файрвол.",
+  "aiError.INSUFFICIENT_CREDITS": "На балансе аккаунта {provider} закончились средства. Пополните на {console}.",
+  "aiError.INVALID_API_KEY": "{provider} отклонил API-ключ. Проверьте, что он скопирован целиком с {console}.",
+  "aiError.PERMISSION_DENIED": "У этого ключа нет доступа к выбранной модели. Проверьте права ключа на {console}.",
+  "aiError.RATE_LIMITED": "Слишком много запросов — {provider} ограничивает частоту. Подождите немного и повторите.",
+  "aiError.SERVER_ERROR": "На стороне {provider} сейчас неполадки. Попробуйте через некоторое время.",
+  "aiError.NETWORK_ERROR": "Не удалось связаться с {provider}. Проверьте интернет, VPN и файрвол.",
   "aiError.UNKNOWN": "Запрос не выполнен.",
   "aiError.details": "Технические подробности",
   "settings.ai.provider": "Провайдер ИИ",
@@ -79,5 +79,6 @@
   "settings.ai.keyStorageNote": "Ключ хранится только в защищённом хранилище ОС — не в базе данных и не в обычном файле настроек.",
   "settings.ai.hint.anthropic": "Оплата по токенам, бесплатного тарифа нет. Час интервью обычно стоит меньше доллара. Ключ здесь:",
   "settings.ai.hint.groq": "Бесплатный тариф без карты: 30 запросов в минуту. Самые быстрые ответы из доступных вариантов. Ключ здесь:",
-  "settings.ai.groqVisionPreview": "Учтите: модель со зрением у Groq имеет статус preview, поэтому разбор скриншотов по Ctrl+B может работать менее стабильно, чем текстовые функции."
+  "settings.ai.groqVisionPreview": "Учтите: модель со зрением у Groq имеет статус preview, поэтому разбор скриншотов по Ctrl+B может работать менее стабильно, чем текстовые функции.",
+  "aiError.anthropicBillingNote": "Учтите: кредиты API оплачиваются отдельно от подписки Claude Pro/Max."
 }
