@@ -64,5 +64,13 @@
   "settings.appearance.themeDarkOnly": "Dark only for now.",
   "settings.general.demoMode": "Demo mode",
   "settings.general.demoModeHint": "Use mock AI/STT — no API key required",
-  "settings.general.language": "Language"
+  "settings.general.language": "Language",
+  "aiError.INSUFFICIENT_CREDITS": "The Anthropic account has no credits left. Top it up at console.anthropic.com → Plans & Billing. (API credits are separate from a Claude Pro/Max subscription.)",
+  "aiError.INVALID_API_KEY": "That API key was rejected. Check it was copied in full from console.anthropic.com → API Keys.",
+  "aiError.PERMISSION_DENIED": "This key is not allowed to use that model. Check the key's permissions in the Anthropic console.",
+  "aiError.RATE_LIMITED": "Too many requests — the API is rate-limiting. Wait a moment and try again.",
+  "aiError.SERVER_ERROR": "The Anthropic API is having trouble right now. Try again shortly.",
+  "aiError.NETWORK_ERROR": "Could not reach the Anthropic API. Check the internet connection, and any VPN or firewall.",
+  "aiError.UNKNOWN": "The request failed.",
+  "aiError.details": "Technical details"
 }

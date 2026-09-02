@@ -64,5 +64,13 @@
   "settings.appearance.themeDarkOnly": "Пока только тёмная.",
   "settings.general.demoMode": "Демо-режим",
   "settings.general.demoModeHint": "Использовать заглушки ИИ и распознавания — API-ключ не нужен",
-  "settings.general.language": "Язык"
+  "settings.general.language": "Язык",
+  "aiError.INSUFFICIENT_CREDITS": "На балансе аккаунта Anthropic закончились средства. Пополните на console.anthropic.com → Plans & Billing. (Кредиты API оплачиваются отдельно от подписки Claude Pro/Max.)",
+  "aiError.INVALID_API_KEY": "API-ключ отклонён. Проверьте, что он скопирован целиком с console.anthropic.com → API Keys.",
+  "aiError.PERMISSION_DENIED": "У этого ключа нет доступа к выбранной модели. Проверьте права ключа в консоли Anthropic.",
+  "aiError.RATE_LIMITED": "Слишком много запросов — сработало ограничение частоты. Подождите немного и повторите.",
+  "aiError.SERVER_ERROR": "На стороне Anthropic сейчас неполадки. Попробуйте через некоторое время.",
+  "aiError.NETWORK_ERROR": "Не удалось связаться с Anthropic API. Проверьте интернет, VPN и файрвол.",
+  "aiError.UNKNOWN": "Запрос не выполнен.",
+  "aiError.details": "Технические подробности"
 }

@@ -53,11 +53,26 @@ export interface AIProvider {
   analyzeConversation(request: AIGenerateRequest): Promise<AIResponse>;
 }
 
+/**
+ * Stable, provider-agnostic reasons a call failed. The UI maps these to
+ * localized copy — the service layer must not build user-facing sentences
+ * itself, and a raw vendor JSON body is not something to show a user.
+ */
+export type AIErrorCode =
+  | "INSUFFICIENT_CREDITS"
+  | "INVALID_API_KEY"
+  | "PERMISSION_DENIED"
+  | "RATE_LIMITED"
+  | "SERVER_ERROR"
+  | "NETWORK_ERROR"
+  | "UNKNOWN";
+
 export class AIProviderError extends Error {
   constructor(
     message: string,
     public readonly cause?: unknown,
     public readonly retryable: boolean = false,
+    public readonly code: AIErrorCode = "UNKNOWN",
   ) {
     super(message);
     this.name = "AIProviderError";

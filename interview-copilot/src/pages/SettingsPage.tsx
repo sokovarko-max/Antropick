@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { AnthropicProvider } from "@/services/ai/AnthropicProvider";
+import { AIProviderError, type AIErrorCode } from "@/services/ai/types";
 import { ANTHROPIC_API_KEY_STORAGE_KEY, secureStoreSet } from "@/services/security/secureStore";
 import { OverlayPanel } from "@/components/OverlayPanel";
 import { useTranslation } from "@/i18n/useTranslation";
@@ -14,7 +15,10 @@ export function SettingsPage() {
   const settings = useSettingsStore();
   const [apiKeyInput, setApiKeyInput] = useState("");
   const [testing, setTesting] = useState(false);
-  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [connectionError, setConnectionError] = useState<{
+    code: AIErrorCode;
+    detail: string;
+  } | null>(null);
   const { t } = useTranslation();
 
   async function handleTestConnection() {
@@ -35,9 +39,14 @@ export function SettingsPage() {
     } catch (error) {
       // Surface the real reason — a silent "not connected" with no detail is
       // exactly what let a real bug (SDK refusing to run in a WebView) go
-      // unnoticed. See docs/security.md: no silent failures.
+      // unnoticed. See docs/security.md: no silent failures. The vendor's raw
+      // JSON body is kept, but behind a disclosure: it is a diagnostic, not
+      // an explanation a user can act on.
       settings.setConnectionStatus("DISCONNECTED");
-      setConnectionError(error instanceof Error ? error.message : String(error));
+      setConnectionError({
+        code: error instanceof AIProviderError ? error.code : "UNKNOWN",
+        detail: error instanceof Error ? error.message : String(error),
+      });
     } finally {
       setTesting(false);
     }
@@ -127,9 +136,15 @@ export function SettingsPage() {
               </span>
             </div>
             {connectionError && (
-              <p className="rounded-lg bg-state-error/10 px-3 py-2 text-sm text-state-error">
-                {connectionError}
-              </p>
+              <div className="space-y-2 rounded-lg bg-state-error/10 px-3 py-2">
+                <p className="text-sm text-state-error">
+                  {t(`aiError.${connectionError.code}` as TranslationKey)}
+                </p>
+                <details className="text-xs text-ink-faint">
+                  <summary className="cursor-pointer">{t("aiError.details")}</summary>
+                  <p className="mt-1 break-all font-mono">{connectionError.detail}</p>
+                </details>
+              </div>
             )}
             <p className="text-xs text-ink-faint">
               The key is stored in OS secure storage only — never in the database or a plain settings

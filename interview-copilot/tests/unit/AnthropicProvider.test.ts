@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { AnthropicProvider } from "@/services/ai/AnthropicProvider";
+import { AnthropicProvider, classifyAnthropicError } from "@/services/ai/AnthropicProvider";
 import { AIProviderError } from "@/services/ai/types";
 import Anthropic from "@anthropic-ai/sdk";
 
@@ -79,5 +79,32 @@ describe("AnthropicProvider", () => {
     expect(call.messages).toHaveLength(2);
     expect(call.messages[1].content[0].type).toBe("image");
     expect(call.messages[1].content[0].source.data).toBe("abc123");
+  });
+});
+
+describe("classifyAnthropicError", () => {
+  it("recognises the real 'credit balance too low' body as a billing problem", () => {
+    // Verbatim from a live 400 hit during Windows testing — the status alone
+    // is indistinguishable from a malformed request, but the fix is different.
+    const body =
+      '400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."}}';
+    expect(classifyAnthropicError(400, body)).toBe("INSUFFICIENT_CREDITS");
+  });
+
+  it("maps auth, permission, rate-limit and server statuses", () => {
+    expect(classifyAnthropicError(401, "authentication_error")).toBe("INVALID_API_KEY");
+    expect(classifyAnthropicError(403, "permission_error")).toBe("PERMISSION_DENIED");
+    expect(classifyAnthropicError(429, "rate_limit_error")).toBe("RATE_LIMITED");
+    expect(classifyAnthropicError(500, "internal error")).toBe("SERVER_ERROR");
+    expect(classifyAnthropicError(529, "overloaded")).toBe("SERVER_ERROR");
+  });
+
+  it("prefers the billing diagnosis over the raw status", () => {
+    // A billing failure can arrive on more than one status code.
+    expect(classifyAnthropicError(403, "billing issue")).toBe("INSUFFICIENT_CREDITS");
+  });
+
+  it("falls back to UNKNOWN for an unrecognised 400", () => {
+    expect(classifyAnthropicError(400, "max_tokens must be positive")).toBe("UNKNOWN");
   });
 });

@@ -6,7 +6,7 @@ import type {
   AIStreamChunk,
   AIVisionRequest,
 } from "./types";
-import { AIProviderError } from "./types";
+import { AIProviderError, type AIErrorCode } from "./types";
 import { DEFAULT_MODEL_PROFILES } from "@/config/models";
 
 export interface AnthropicProviderOptions {
@@ -144,10 +144,34 @@ function toAIResponse(response: Anthropic.Message): AIResponse {
   };
 }
 
+/**
+ * Classifies a vendor failure into a stable code the UI can localize.
+ *
+ * A 400 whose body mentions the credit balance is the one case worth reading
+ * the message for: the status alone is indistinguishable from a malformed
+ * request, but the fix (top up the account) is completely different.
+ */
+export function classifyAnthropicError(status: number | undefined, rawMessage: string): AIErrorCode {
+  const message = rawMessage.toLowerCase();
+  if (message.includes("credit balance") || message.includes("billing")) {
+    return "INSUFFICIENT_CREDITS";
+  }
+  if (status === 401) return "INVALID_API_KEY";
+  if (status === 403) return "PERMISSION_DENIED";
+  if (status === 429) return "RATE_LIMITED";
+  if (status !== undefined && status >= 500) return "SERVER_ERROR";
+  return "UNKNOWN";
+}
+
 function wrapError(error: unknown): AIProviderError {
   if (error instanceof Anthropic.APIError) {
     const retryable = error.status === 429 || (error.status !== undefined && error.status >= 500);
-    return new AIProviderError(`Anthropic API error: ${error.message}`, error, retryable);
+    const code = classifyAnthropicError(error.status, error.message);
+    return new AIProviderError(`Anthropic API error: ${error.message}`, error, retryable, code);
   }
-  return new AIProviderError("Anthropic provider failed", error, false);
+  // No HTTP status at all usually means the request never left the machine.
+  if (error instanceof Error && /fetch|network|ENOTFOUND|ECONNREFUSED/i.test(error.message)) {
+    return new AIProviderError(error.message, error, true, "NETWORK_ERROR");
+  }
+  return new AIProviderError("Anthropic provider failed", error, false, "UNKNOWN");
 }
