@@ -82,3 +82,23 @@ export const MODEL_PROFILES: Record<ProviderId, Record<TaskType, ModelProfile>> 
 
 /** Kept for call sites that predate multi-provider support. */
 export const DEFAULT_MODEL_PROFILES = MODEL_PROFILES.anthropic;
+
+/**
+ * USD per 1M tokens, for the in-app estimate only — not billing-accurate.
+ *
+ * Every model in MODEL_PROFILES must appear here, including the free ones at
+ * zero: a missing entry makes estimateCostUsd return null, and the UI then
+ * refuses to show a figure rather than inventing one. A test enforces the
+ * coverage so adding a paid provider cannot silently fall back to some other
+ * vendor's prices.
+ */
+export const MODEL_PRICING: Record<string, { inputPerMillionUsd: number; outputPerMillionUsd: number }> = {
+  "claude-opus-4-1": { inputPerMillionUsd: 15, outputPerMillionUsd: 75 },
+  "claude-sonnet-4-5": { inputPerMillionUsd: 3, outputPerMillionUsd: 15 },
+  "claude-haiku-4-5": { inputPerMillionUsd: 0.8, outputPerMillionUsd: 4 },
+  // Groq is wired to its free tier, which bills nothing. If a paid tier is
+  // ever configured here, these need real numbers.
+  "openai/gpt-oss-120b": { inputPerMillionUsd: 0, outputPerMillionUsd: 0 },
+  "openai/gpt-oss-20b": { inputPerMillionUsd: 0, outputPerMillionUsd: 0 },
+  "qwen/qwen3.6-27b": { inputPerMillionUsd: 0, outputPerMillionUsd: 0 },
+};

@@ -97,7 +97,8 @@ export interface AIResponseRecord {
   createdAtMs: number;
   inputTokens: number;
   outputTokens: number;
-  estimatedCostUsd: number;
+  /** null when the answering model has no price on file (demo mode included). */
+  estimatedCostUsd: number | null;
 }
 
 export interface Session {

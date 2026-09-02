@@ -60,7 +60,11 @@ export const aiResponses = sqliteTable("ai_responses", {
   createdAtMs: integer("created_at_ms").notNull(),
   inputTokens: integer("input_tokens").notNull().default(0),
   outputTokens: integer("output_tokens").notNull().default(0),
-  estimatedCostUsd: real("estimated_cost_usd").notNull().default(0),
+  // Nullable on purpose: null means "the answering model has no price on
+  // file" (demo mode, or a vendor added without pricing). Storing 0 there
+  // would claim the call was free, and storing a guess would claim a cost
+  // that was never incurred.
+  estimatedCostUsd: real("estimated_cost_usd"),
 });
 
 export const screenshots = sqliteTable("screenshots", {

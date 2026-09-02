@@ -20,14 +20,17 @@ export function SettingsPage() {
     code: AIErrorCode;
     detail: string;
   } | null>(null);
+  const [demoModeTurnedOff, setDemoModeTurnedOff] = useState(false);
   const { t } = useTranslation();
 
   async function handleTestConnection() {
     setTesting(true);
     setConnectionError(null);
+    setDemoModeTurnedOff(false);
     settings.setConnectionStatus("UNKNOWN");
     try {
-      await secureStoreSet(apiKeyStorageKey(settings.aiProvider), apiKeyInput);
+      // Validate before storing: writing first meant a typo'd key overwrote a
+      // working one that was already in the OS keychain.
       const provider = createAIProvider(settings.aiProvider, apiKeyInput);
       await provider.generate({
         taskType: "CHAT",
@@ -35,8 +38,17 @@ export function SettingsPage() {
         messages: [{ role: "user", content: "ping" }],
         maxTokens: 5,
       });
+      await secureStoreSet(apiKeyStorageKey(settings.aiProvider), apiKeyInput);
       settings.setConnectionStatus("CONNECTED");
       settings.setApiKeyPresent(settings.aiProvider, true);
+      // A key that just answered a live request is unambiguous intent to stop
+      // using mock answers. Demo mode defaults to on and is persisted, so
+      // without this the app keeps serving canned text after a successful
+      // test and looks like the key did nothing.
+      if (settings.demoMode) {
+        settings.setDemoMode(false);
+        setDemoModeTurnedOff(true);
+      }
     } catch (error) {
       // Surface the real reason — a silent "not connected" with no detail is
       // exactly what let a real bug (SDK refusing to run in a WebView) go
@@ -160,6 +172,16 @@ export function SettingsPage() {
                     : ""}
               </span>
             </div>
+            {demoModeTurnedOff && (
+              <p className="rounded-lg bg-state-listening/10 px-3 py-2 text-sm text-state-listening">
+                {t("settings.ai.demoModeTurnedOff")}
+              </p>
+            )}
+            {settings.demoMode && (
+              <p className="rounded-lg bg-state-thinking/10 px-3 py-2 text-sm text-state-thinking">
+                {t("settings.ai.demoModeOverridesKey")}
+              </p>
+            )}
             {connectionError && (
               <div className="space-y-2 rounded-lg bg-state-error/10 px-3 py-2">
                 <p className="text-sm text-state-error">

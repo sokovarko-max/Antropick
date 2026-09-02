@@ -12,8 +12,17 @@ import { MemoryManager } from "@/services/memory/MemoryManager";
 import { VisionService } from "@/services/vision/VisionService";
 import { SessionAnalysisService } from "@/services/session/SessionAnalysisService";
 
+/**
+ * Why the app is serving mock answers. The UI needs the distinction: "you
+ * switched it on" is fixed in Settings > General, "no key" is fixed in
+ * Settings > AI, and a banner that does not say which leaves the user with no
+ * way to get out of demo mode.
+ */
+export type DemoModeReason = "EXPLICIT_SETTING" | "NO_API_KEY";
+
 export interface AppServices {
   isDemoMode: boolean;
+  demoModeReason: DemoModeReason | null;
   providerId: ProviderId;
   aiProvider: AIProvider;
   modelRouter: ModelRouter;
@@ -55,7 +64,16 @@ export function createAIProvider(providerId: ProviderId, apiKey: string): AIProv
  * single switch instead of scattered conditionals.
  */
 export function buildAppServices(options: BuildServicesOptions): AppServices {
-  const useDemoMode = options.demoMode || !options.apiKey;
+  // The explicit setting is checked first so the banner names the switch the
+  // user actually has to flip: with demo mode on, a perfectly good API key is
+  // still ignored, and reporting "no API key" there would send them to fix
+  // something that isn't broken.
+  const demoModeReason: DemoModeReason | null = options.demoMode
+    ? "EXPLICIT_SETTING"
+    : !options.apiKey
+      ? "NO_API_KEY"
+      : null;
+  const useDemoMode = demoModeReason !== null;
 
   const aiProvider: AIProvider = useDemoMode
     ? new MockAIProvider()
@@ -66,6 +84,7 @@ export function buildAppServices(options: BuildServicesOptions): AppServices {
 
   return {
     isDemoMode: useDemoMode,
+    demoModeReason,
     providerId: options.providerId,
     aiProvider,
     modelRouter,

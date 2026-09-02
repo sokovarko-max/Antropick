@@ -108,29 +108,55 @@ describe("OpenAICompatibleProvider.stream", () => {
     JSON.stringify({ choices: [{ delta: { content: "Focus " } }] }),
     JSON.stringify({ choices: [{ delta: { content: "on " } }] }),
     JSON.stringify({ choices: [{ delta: { content: "reliability." } }] }),
-    JSON.stringify({ choices: [], usage: { prompt_tokens: 40, completion_tokens: 6 } }),
+    JSON.stringify({
+      model: "openai/gpt-oss-120b",
+      choices: [],
+      usage: { prompt_tokens: 40, completion_tokens: 6 },
+    }),
   ];
 
   async function collect(response: Response) {
     const fetchImpl = vi.fn().mockResolvedValue(response);
     const chunks: string[] = [];
     let final: { inputTokens: number; outputTokens: number } | undefined;
+    let modelId: string | undefined;
 
     for await (const chunk of provider(fetchImpl as unknown as typeof fetch).stream({
       taskType: "REALTIME",
       systemPrompt: "s",
       messages: [{ role: "user", content: "q" }],
     })) {
-      if (chunk.done) final = chunk.usage;
-      else chunks.push(chunk.delta);
+      if (chunk.done) {
+        final = chunk.usage;
+        modelId = chunk.modelId;
+      } else {
+        chunks.push(chunk.delta);
+      }
     }
-    return { text: chunks.join(""), final };
+    return { text: chunks.join(""), final, modelId };
   }
 
   it("assembles the streamed answer and the final usage frame", async () => {
     const { text, final } = await collect(sseResponse(frames));
     expect(text).toBe("Focus on reliability.");
     expect(final).toEqual({ inputTokens: 40, outputTokens: 6 });
+  });
+
+  it("reports the model the vendor actually served, for pricing", async () => {
+    // The caller prices the answer by this id. Reporting the requested model
+    // instead is how a demo answer ended up billed at a real model's rate.
+    const { modelId } = await collect(sseResponse(frames));
+    expect(modelId).toBe("openai/gpt-oss-120b");
+  });
+
+  it("falls back to the requested model when no frame names one", async () => {
+    const anonymous = frames.map((f) => {
+      const parsed = JSON.parse(f) as Record<string, unknown>;
+      delete parsed.model;
+      return JSON.stringify(parsed);
+    });
+    const { modelId } = await collect(sseResponse(anonymous));
+    expect(modelId).toBe("openai/gpt-oss-120b");
   });
 
   it("survives frames split mid-JSON across network reads", async () => {

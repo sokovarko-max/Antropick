@@ -99,7 +99,34 @@ export const useSettingsStore = create<SettingsState>()(
       setCostLimits: (patch) => set((s) => ({ costLimits: { ...s.costLimits, ...patch } })),
       completeOnboarding: () => set({ hasCompletedOnboarding: true }),
     }),
-    { name: "interview-copilot-settings" },
+    {
+      name: "interview-copilot-settings",
+      version: 1,
+      /**
+       * v0 stored a single `anthropicApiKeyPresent` flag, from before the app
+       * supported more than one vendor. Zustand's default merge is shallow,
+       * so without this an upgraded install keeps that dead key and lands on
+       * `apiKeyPresent: { anthropic: false, ... }` — the app then reports no
+       * key, silently falls back to mock answers, and the user sees an
+       * install that "won't leave demo mode".
+       */
+      migrate: (persisted, version) => {
+        const state = persisted as Partial<SettingsState> & {
+          anthropicApiKeyPresent?: boolean;
+        };
+        if (version >= 1) return state as SettingsState;
+        const { anthropicApiKeyPresent, ...rest } = state;
+        return {
+          ...rest,
+          apiKeyPresent: {
+            anthropic: anthropicApiKeyPresent ?? false,
+            groq: false,
+          },
+          // v0 predates provider choice; it could only have been Anthropic.
+          aiProvider: anthropicApiKeyPresent ? "anthropic" : (rest.aiProvider ?? "groq"),
+        } as SettingsState;
+      },
+    },
   ),
 );
 

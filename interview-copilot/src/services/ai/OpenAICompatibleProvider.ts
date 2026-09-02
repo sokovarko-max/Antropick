@@ -79,6 +79,7 @@ export class OpenAICompatibleProvider implements AIProvider {
     const decoder = new TextDecoder();
     let buffer = "";
     let usage: { inputTokens: number; outputTokens: number } | undefined;
+    let servedModelId: string | undefined;
 
     try {
       for (;;) {
@@ -104,6 +105,8 @@ export class OpenAICompatibleProvider implements AIProvider {
             continue; // keep-alive or partial frame
           }
 
+          if (typeof frame.model === "string") servedModelId = frame.model;
+
           const delta = extractDelta(frame);
           if (delta) yield { delta, done: false };
 
@@ -115,7 +118,12 @@ export class OpenAICompatibleProvider implements AIProvider {
       reader.releaseLock();
     }
 
-    yield { delta: "", done: true, usage: usage ?? { inputTokens: 0, outputTokens: 0 } };
+    yield {
+      delta: "",
+      done: true,
+      usage: usage ?? { inputTokens: 0, outputTokens: 0 },
+      modelId: servedModelId ?? profile.modelId,
+    };
   }
 
   async analyzeImage(request: AIVisionRequest): Promise<AIResponse> {

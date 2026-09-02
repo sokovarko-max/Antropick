@@ -101,7 +101,10 @@ export class RealtimePipeline {
     let fullText = "";
     let inputTokens = 0;
     let outputTokens = 0;
-    const modelId = this.services.modelRouter.resolveProfile("REALTIME").modelId;
+    // Starts as the model we asked for, and is replaced by whatever actually
+    // answered once the final chunk reports it. Reporting the requested model
+    // unconditionally is what made demo answers look like paid Sonnet calls.
+    let modelId = this.services.modelRouter.resolveProfile("REALTIME").modelId;
 
     try {
       for await (const chunk of this.services.aiProvider.stream({
@@ -112,10 +115,13 @@ export class RealtimePipeline {
         if (!chunk.done) {
           fullText += chunk.delta;
           this.callbacks.onAnswerDelta(chunk.delta);
-        } else if (chunk.usage) {
+          continue;
+        }
+        if (chunk.usage) {
           inputTokens = chunk.usage.inputTokens;
           outputTokens = chunk.usage.outputTokens;
         }
+        if (chunk.modelId) modelId = chunk.modelId;
       }
       this.callbacks.onAnswerComplete({ prompt: userPrompt, fullText, inputTokens, outputTokens, modelId });
     } catch (error) {

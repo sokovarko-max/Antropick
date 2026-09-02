@@ -113,8 +113,17 @@ export function SessionDetailPage() {
                   ))}
                 </ul>
               )}
+              {/* Tokens are always known; a price is shown only when the
+                  model that answered has a rate on file and that rate is not
+                  zero. Demo answers and free-tier calls therefore say so
+                  instead of displaying money that was never spent. */}
               <p className="mt-2 text-xs text-ink-faint">
-                {r.inputTokens + r.outputTokens} tokens · ${r.estimatedCostUsd.toFixed(4)}
+                {t("session.tokensUsed", { count: String(r.inputTokens + r.outputTokens) })}
+                {r.estimatedCostUsd === null
+                  ? ` · ${t("session.costUnknown")}`
+                  : r.estimatedCostUsd === 0
+                    ? ` · ${t("session.costFree")}`
+                    : ` · $${r.estimatedCostUsd.toFixed(4)}`}
               </p>
             </div>
           ))}

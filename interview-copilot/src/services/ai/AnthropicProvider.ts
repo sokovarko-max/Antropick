@@ -86,6 +86,9 @@ export class AnthropicProvider implements AIProvider {
           inputTokens: final.usage.input_tokens,
           outputTokens: final.usage.output_tokens,
         },
+        // The resolved model, not `profile.modelId`: an alias like
+        // "claude-sonnet-4-5" comes back as a dated snapshot.
+        modelId: final.model,
       };
     } catch (error) {
       throw wrapError(error);

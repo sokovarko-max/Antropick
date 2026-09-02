@@ -38,6 +38,13 @@ export interface AIStreamChunk {
   delta: string;
   done: boolean;
   usage?: AIUsage;
+  /**
+   * The model that actually produced the text, reported on the final chunk.
+   * Callers must prefer this over the model they asked for: the two differ in
+   * demo mode (a mock answered) and whenever a vendor silently serves an
+   * alias, and pricing the answer by the wrong one invents a cost.
+   */
+  modelId?: string;
 }
 
 /**

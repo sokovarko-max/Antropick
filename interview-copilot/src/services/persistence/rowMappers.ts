@@ -135,7 +135,9 @@ const aiResponseRowSchema = z.object({
   created_at_ms: z.number(),
   input_tokens: z.number(),
   output_tokens: z.number(),
-  estimated_cost_usd: z.number(),
+  // Nullable: rows written in demo mode (or by a provider with no pricing on
+  // file) carry no cost at all rather than a fabricated one.
+  estimated_cost_usd: z.number().nullable(),
 });
 
 export function rowToAiResponse(row: unknown): AIResponseRecord {

@@ -1,20 +1,18 @@
 import type { AIUsage } from "@/services/ai/types";
+import { MODEL_PRICING } from "@/config/models";
 
 /**
- * Rough per-model USD pricing (per 1M tokens), used only for the in-app cost
- * estimate shown to the user — not billing-accurate. Kept as data, not
- * scattered literals, so it's one place to update.
+ * Returns null when the model has no price on file — the caller must then
+ * decline to show a figure. Guessing here is what let demo mode display
+ * money that was never spent: fabricated token counts were multiplied by a
+ * real model's rate because the fallback pretended to know the price.
  */
-const PRICE_PER_MILLION_TOKENS_USD: Record<string, { input: number; output: number }> = {
-  "claude-opus-4-1": { input: 15, output: 75 },
-  "claude-sonnet-4-5": { input: 3, output: 15 },
-  "claude-haiku-4-5": { input: 0.8, output: 4 },
-};
-
-export function estimateCostUsd(modelId: string, usage: AIUsage): number {
-  const pricing = PRICE_PER_MILLION_TOKENS_USD[modelId] ?? { input: 3, output: 15 };
+export function estimateCostUsd(modelId: string, usage: AIUsage): number | null {
+  const pricing = MODEL_PRICING[modelId];
+  if (!pricing) return null;
   return (
-    (usage.inputTokens / 1_000_000) * pricing.input + (usage.outputTokens / 1_000_000) * pricing.output
+    (usage.inputTokens / 1_000_000) * pricing.inputPerMillionUsd +
+    (usage.outputTokens / 1_000_000) * pricing.outputPerMillionUsd
   );
 }
 
@@ -30,7 +28,12 @@ export class CostMonitor {
 
   constructor(private readonly limits: CostLimits) {}
 
-  record(costUsd: number): void {
+  /**
+   * A null cost means "unknown", not "free", so it is not folded into the
+   * running total — adding it as zero would quietly under-report spend.
+   */
+  record(costUsd: number | null): void {
+    if (costUsd === null) return;
     this.sessionCostUsd += costUsd;
     this.dailyCostUsd += costUsd;
   }
