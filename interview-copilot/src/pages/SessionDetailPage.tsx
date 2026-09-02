@@ -2,12 +2,13 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useAppServices } from "@/services/runtime/useAppServices";
-import { t } from "@/i18n";
+import { useTranslation } from "@/i18n/useTranslation";
+import type { TranslationKey } from "@/i18n";
 import type { ScoreCategory } from "@/types";
 
 type Tab = "overview" | "transcript" | "answers" | "screenshots" | "analysis" | "chat";
 
-const TABS: { id: Tab; labelKey: Parameters<typeof t>[0] }[] = [
+const TABS: { id: Tab; labelKey: TranslationKey }[] = [
   { id: "overview", labelKey: "session.tabs.overview" },
   { id: "transcript", labelKey: "session.tabs.transcript" },
   { id: "answers", labelKey: "session.tabs.aiAnswers" },
@@ -27,6 +28,7 @@ export function SessionDetailPage() {
   const setAnalysis = useSessionStore((s) => s.setAnalysis);
   const services = useAppServices();
   const [analyzing, setAnalyzing] = useState(false);
+  const { t } = useTranslation();
 
   if (!session || !sessionId) return <p className="text-sm text-ink-muted">Session not found.</p>;
 

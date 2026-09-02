@@ -31,6 +31,8 @@ export interface SettingsState {
   locale: Locale;
   responseMode: ResponseMode;
   framework: InterviewFramework;
+  /** Opacity of the floating overlay panel, 0.3–1. */
+  overlayOpacity: number;
   hotkeys: HotkeyBindings;
   privacy: PrivacySettings;
   costLimits: CostLimitSettings;
@@ -41,6 +43,7 @@ export interface SettingsState {
   setConnectionStatus: (status: SettingsState["connectionStatus"]) => void;
   setLocale: (locale: Locale) => void;
   setResponseMode: (mode: ResponseMode) => void;
+  setOverlayOpacity: (opacity: number) => void;
   setFramework: (framework: InterviewFramework) => void;
   setHotkey: (action: keyof HotkeyBindings, combo: string) => void;
   setPrivacy: (patch: Partial<PrivacySettings>) => void;
@@ -57,6 +60,7 @@ export const useSettingsStore = create<SettingsState>()(
       locale: "en",
       responseMode: "SHORT",
       framework: "NONE",
+      overlayOpacity: 1,
       hotkeys: {
         askAi: "Ctrl+Q",
         screenshot: "Ctrl+B",
@@ -77,6 +81,10 @@ export const useSettingsStore = create<SettingsState>()(
       setConnectionStatus: (status) => set({ connectionStatus: status }),
       setLocale: (locale) => set({ locale }),
       setResponseMode: (mode) => set({ responseMode: mode }),
+      // Clamped so the panel can never be made invisible (and therefore
+      // impossible to find and fix) by dragging the slider to zero.
+      setOverlayOpacity: (opacity) =>
+        set({ overlayOpacity: Math.min(1, Math.max(0.3, opacity)) }),
       setFramework: (framework) => set({ framework }),
       setHotkey: (action, combo) =>
         set((s) => ({ hotkeys: { ...s.hotkeys, [action]: combo } })),

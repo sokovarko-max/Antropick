@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useSessionStore } from "@/stores/sessionStore";
 import type { InterviewFramework, ResponseMode, SessionMode } from "@/types";
 import { DocumentUploader } from "@/features/documents/DocumentUploader";
-import { t } from "@/i18n";
+import { useTranslation } from "@/i18n/useTranslation";
 
 const FRAMEWORKS: InterviewFramework[] = [
   "NONE",
@@ -20,6 +20,7 @@ const FRAMEWORKS: InterviewFramework[] = [
 export function NewSessionPage() {
   const navigate = useNavigate();
   const createSession = useSessionStore((s) => s.createSession);
+  const { t } = useTranslation();
 
   const [role, setRole] = useState("");
   const [company, setCompany] = useState("");

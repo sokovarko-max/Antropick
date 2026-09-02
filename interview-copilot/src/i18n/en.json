@@ -56,5 +56,13 @@
   "session.tabs.screenshots": "Screenshots",
   "session.tabs.analysis": "Analysis",
   "session.tabs.chat": "Chat",
-  "demoMode.banner": "Demo mode — using mock AI responses, no API key required"
+  "demoMode.banner": "Demo mode — using mock AI responses, no API key required",
+  "settings.appearance.overlayOpacity": "Overlay opacity",
+  "settings.appearance.overlayOpacityHint": "How see-through the floating panel is during a call. Lower values let you read what is behind it.",
+  "settings.appearance.preview": "Preview",
+  "settings.appearance.theme": "Theme",
+  "settings.appearance.themeDarkOnly": "Dark only for now.",
+  "settings.general.demoMode": "Demo mode",
+  "settings.general.demoModeHint": "Use mock AI/STT — no API key required",
+  "settings.general.language": "Language"
 }

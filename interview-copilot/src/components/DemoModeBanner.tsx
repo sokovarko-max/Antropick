@@ -1,8 +1,9 @@
 import { useAppServices } from "@/services/runtime/useAppServices";
-import { t } from "@/i18n";
+import { useTranslation } from "@/i18n/useTranslation";
 
 export function DemoModeBanner() {
   const { isDemoMode } = useAppServices();
+  const { t } = useTranslation();
   if (!isDemoMode) return null;
 
   return (

@@ -1,11 +1,12 @@
 import { Link } from "react-router-dom";
 import { useSessionStore } from "@/stores/sessionStore";
-import { t } from "@/i18n";
+import { useTranslation } from "@/i18n/useTranslation";
 
 export function DashboardPage() {
   const sessions = useSessionStore((s) => s.sessions);
   const aiResponses = useSessionStore((s) => s.aiResponses);
   const analyses = useSessionStore((s) => s.analyses);
+  const { t } = useTranslation();
 
   const totalQuestions = Object.values(aiResponses).reduce((sum, list) => sum + list.length, 0);
   const scores = Object.values(analyses).map((a) => a.overallScore);

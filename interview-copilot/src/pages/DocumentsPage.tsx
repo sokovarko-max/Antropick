@@ -1,9 +1,10 @@
 import { useSessionStore } from "@/stores/sessionStore";
-import { t } from "@/i18n";
+import { useTranslation } from "@/i18n/useTranslation";
 
 export function DocumentsPage() {
   const documentChunks = useSessionStore((s) => s.documentChunks);
   const sessions = useSessionStore((s) => s.sessions);
+  const { t } = useTranslation();
 
   const bySession = Object.entries(documentChunks);
 

@@ -1,19 +1,37 @@
 import { useOverlayStore } from "@/stores/overlayStore";
+import { useSettingsStore } from "@/stores/settingsStore";
 import { StatusPill } from "./StatusPill";
-import { t } from "@/i18n";
+import { useTranslation } from "@/i18n/useTranslation";
 
 export interface OverlayPanelProps {
   onAskAi: () => void;
   onScreenshot: () => void;
   onTogglePause: () => void;
   onHide: () => void;
+  /** Overrides the stored opacity — used by the Settings live preview. */
+  opacityOverride?: number;
 }
 
-export function OverlayPanel({ onAskAi, onScreenshot, onTogglePause, onHide }: OverlayPanelProps) {
+export function OverlayPanel({
+  onAskAi,
+  onScreenshot,
+  onTogglePause,
+  onHide,
+  opacityOverride,
+}: OverlayPanelProps) {
+  const { t } = useTranslation();
   const { state, question, answer, keyPoints, errorMessage, isPaused } = useOverlayStore();
+  const storedOpacity = useSettingsStore((s) => s.overlayOpacity);
+  // The overlay window itself is transparent (see tauri.conf.json), so fading
+  // the panel genuinely reveals the call behind it rather than blending into
+  // an opaque window background.
+  const opacity = opacityOverride ?? storedOpacity;
 
   return (
-    <div className="flex w-full max-w-md flex-col gap-3 rounded-2xl border border-surface-border bg-surface-overlay/95 p-4 shadow-2xl backdrop-blur">
+    <div
+      style={{ opacity }}
+      className="flex w-full max-w-md flex-col gap-3 rounded-2xl border border-surface-border bg-surface-overlay/95 p-4 shadow-2xl backdrop-blur transition-opacity"
+    >
       <div className="flex items-center justify-between">
         <StatusPill state={state} />
         <div className="flex gap-1.5">

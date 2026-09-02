@@ -2,7 +2,9 @@ import { useState } from "react";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { AnthropicProvider } from "@/services/ai/AnthropicProvider";
 import { ANTHROPIC_API_KEY_STORAGE_KEY, secureStoreSet } from "@/services/security/secureStore";
-import { t } from "@/i18n";
+import { OverlayPanel } from "@/components/OverlayPanel";
+import { useTranslation } from "@/i18n/useTranslation";
+import type { TranslationKey } from "@/i18n";
 
 const SECTIONS = ["general", "ai", "audio", "appearance", "hotkeys", "privacy", "storage", "advanced"] as const;
 type Section = (typeof SECTIONS)[number];
@@ -13,6 +15,7 @@ export function SettingsPage() {
   const [apiKeyInput, setApiKeyInput] = useState("");
   const [testing, setTesting] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
+  const { t } = useTranslation();
 
   async function handleTestConnection() {
     setTesting(true);
@@ -47,11 +50,14 @@ export function SettingsPage() {
           <button
             key={s}
             onClick={() => setSection(s)}
-            className={`block w-full rounded-lg px-3 py-2 text-left text-sm capitalize ${
+            // No `capitalize` here: the labels come from the dictionaries
+            // already cased correctly, and title-casing every word is wrong
+            // in Russian ("Внешний Вид" instead of "Внешний вид").
+            className={`block w-full rounded-lg px-3 py-2 text-left text-sm ${
               section === s ? "bg-accent/15 text-accent" : "text-ink-muted hover:bg-surface-raised"
             }`}
           >
-            {t(`settings.${s}` as Parameters<typeof t>[0])}
+            {t(`settings.${s}` as TranslationKey)}
           </button>
         ))}
       </nav>
@@ -63,8 +69,8 @@ export function SettingsPage() {
           <div className="space-y-4">
             <label className="flex items-center justify-between rounded-xl border border-surface-border bg-surface-raised p-4">
               <div>
-                <p className="text-sm font-medium text-ink">Demo mode</p>
-                <p className="text-xs text-ink-muted">Use mock AI/STT — no API key required</p>
+                <p className="text-sm font-medium text-ink">{t("settings.general.demoMode")}</p>
+                <p className="text-xs text-ink-muted">{t("settings.general.demoModeHint")}</p>
               </div>
               <input
                 type="checkbox"
@@ -73,7 +79,9 @@ export function SettingsPage() {
               />
             </label>
             <label className="block space-y-1.5">
-              <span className="text-sm font-medium text-ink-muted">Language</span>
+              <span className="text-sm font-medium text-ink-muted">
+                {t("settings.general.language")}
+              </span>
               <select
                 value={settings.locale}
                 onChange={(e) => settings.setLocale(e.target.value as "en" | "ru")}
@@ -138,7 +146,61 @@ export function SettingsPage() {
         )}
 
         {section === "appearance" && (
-          <p className="text-sm text-ink-muted">Dark theme only in this scaffold.</p>
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-ink">
+                  {t("settings.appearance.overlayOpacity")}
+                </span>
+                <span className="text-sm tabular-nums text-ink-muted">
+                  {Math.round(settings.overlayOpacity * 100)}%
+                </span>
+              </div>
+              <input
+                type="range"
+                min={30}
+                max={100}
+                step={5}
+                value={Math.round(settings.overlayOpacity * 100)}
+                onChange={(e) => settings.setOverlayOpacity(Number(e.target.value) / 100)}
+                className="w-full accent-accent"
+              />
+              <p className="text-xs text-ink-faint">
+                {t("settings.appearance.overlayOpacityHint")}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-ink-muted">
+                {t("settings.appearance.preview")}
+              </p>
+              {/* Checkerboard stands in for whatever is behind the overlay, so
+                  the effect is visible without starting a real session. */}
+              <div
+                className="flex justify-center rounded-xl p-4"
+                style={{
+                  backgroundImage:
+                    "linear-gradient(45deg, #1b1f27 25%, transparent 25%, transparent 75%, #1b1f27 75%), linear-gradient(45deg, #1b1f27 25%, transparent 25%, transparent 75%, #1b1f27 75%)",
+                  backgroundSize: "16px 16px",
+                  backgroundPosition: "0 0, 8px 8px",
+                  backgroundColor: "#0f1216",
+                }}
+              >
+                <OverlayPanel
+                  opacityOverride={settings.overlayOpacity}
+                  onAskAi={() => {}}
+                  onScreenshot={() => {}}
+                  onTogglePause={() => {}}
+                  onHide={() => {}}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-ink-muted">{t("settings.appearance.theme")}</p>
+              <p className="text-sm text-ink-muted">{t("settings.appearance.themeDarkOnly")}</p>
+            </div>
+          </div>
         )}
 
         {section === "hotkeys" && (

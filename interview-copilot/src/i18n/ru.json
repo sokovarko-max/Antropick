@@ -56,5 +56,13 @@
   "session.tabs.screenshots": "Скриншоты",
   "session.tabs.analysis": "Анализ",
   "session.tabs.chat": "Чат",
-  "demoMode.banner": "Демо-режим — используются тестовые ответы ИИ, API-ключ не требуется"
+  "demoMode.banner": "Демо-режим — используются тестовые ответы ИИ, API-ключ не требуется",
+  "settings.appearance.overlayOpacity": "Прозрачность оверлея",
+  "settings.appearance.overlayOpacityHint": "Насколько прозрачна плавающая панель во время звонка. Меньше значение — лучше видно то, что за ней.",
+  "settings.appearance.preview": "Предпросмотр",
+  "settings.appearance.theme": "Тема",
+  "settings.appearance.themeDarkOnly": "Пока только тёмная.",
+  "settings.general.demoMode": "Демо-режим",
+  "settings.general.demoModeHint": "Использовать заглушки ИИ и распознавания — API-ключ не нужен",
+  "settings.general.language": "Язык"
 }

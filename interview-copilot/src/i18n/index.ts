@@ -6,17 +6,16 @@ export type TranslationKey = keyof typeof en;
 
 const DICTIONARIES: Record<Locale, Record<string, string>> = { en, ru };
 
-let currentLocale: Locale = "en";
-
-export function setLocale(locale: Locale): void {
-  currentLocale = locale;
-}
-
-export function getLocale(): Locale {
-  return currentLocale;
-}
-
-/** No hardcoded UI copy in components — always go through t(). See CLAUDE.md. */
-export function t(key: TranslationKey, locale: Locale = currentLocale): string {
+/**
+ * Pure lookup — the locale is always passed in explicitly.
+ *
+ * There used to be a module-level `currentLocale` here with a `setLocale`
+ * setter. That is exactly why switching to Russian did nothing: the settings
+ * store never called the setter, and even if it had, a module variable is
+ * invisible to React so nothing would re-render. Components must go through
+ * `useTranslation()`, which reads the locale from the store and therefore
+ * re-renders when it changes.
+ */
+export function t(key: TranslationKey, locale: Locale): string {
   return DICTIONARIES[locale][key] ?? DICTIONARIES.en[key] ?? key;
 }

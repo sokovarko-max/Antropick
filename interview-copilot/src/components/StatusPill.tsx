@@ -1,5 +1,6 @@
 import type { OverlayState } from "@/types";
-import { t } from "@/i18n";
+import { useTranslation } from "@/i18n/useTranslation";
+import type { TranslationKey } from "@/i18n";
 
 const STATE_STYLES: Record<OverlayState, string> = {
   IDLE: "bg-ink-faint/20 text-ink-muted",
@@ -9,7 +10,7 @@ const STATE_STYLES: Record<OverlayState, string> = {
   ERROR: "bg-state-error/15 text-state-error",
 };
 
-const STATE_LABEL_KEYS: Record<OverlayState, Parameters<typeof t>[0]> = {
+const STATE_LABEL_KEYS: Record<OverlayState, TranslationKey> = {
   IDLE: "overlay.status.idle",
   LISTENING: "overlay.status.listening",
   THINKING: "overlay.status.thinking",
@@ -18,6 +19,7 @@ const STATE_LABEL_KEYS: Record<OverlayState, Parameters<typeof t>[0]> = {
 };
 
 export function StatusPill({ state }: { state: OverlayState }) {
+  const { t } = useTranslation();
   return (
     <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${STATE_STYLES[state]}`}>
       <span className="h-1.5 w-1.5 rounded-full bg-current" />
