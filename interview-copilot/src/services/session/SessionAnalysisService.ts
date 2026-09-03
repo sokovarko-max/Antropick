@@ -52,6 +52,7 @@ export class SessionAnalysisService {
           content: `Full transcript:\n${transcriptText}\n\nAI suggestions shown during the session:\n${responsesText}`,
         },
       ],
+      responseLanguage,
     });
 
     const jsonStart = response.text.indexOf("{");

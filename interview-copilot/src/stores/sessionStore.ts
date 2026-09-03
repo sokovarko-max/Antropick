@@ -6,6 +6,7 @@ import type {
   AIResponseRecord,
   DocumentChunk,
   InterviewFramework,
+  ResponseLanguage,
   ResponseMode,
   Session,
   SessionAnalysis,
@@ -52,6 +53,7 @@ interface SessionState {
   hydrate: () => Promise<void>;
   createSession: (input: NewSessionInput) => Session;
   endSession: (sessionId: string) => void;
+  setResponseLanguage: (sessionId: string, language: ResponseLanguage) => void;
   setSummary: (sessionId: string, summary: string) => void;
   appendTranscript: (segment: TranscriptSegment) => void;
   appendAiResponse: (record: AIResponseRecord) => void;
@@ -155,6 +157,21 @@ export const useSessionStore = create<SessionState>()((set, get) => ({
     }));
     const updated = get().sessions.find((s) => s.id === sessionId);
     if (updated) persist("endSession", () => getPersistenceAdapter().saveSession(updated));
+  },
+
+  /**
+   * The language is fixed when the session is created, but a session started
+   * before this was settable — or simply started on the wrong setting — was
+   * stuck answering in English with nothing in the UI able to change it.
+   */
+  setResponseLanguage: (sessionId, responseLanguage) => {
+    set((s) => ({
+      sessions: s.sessions.map((sess) =>
+        sess.id === sessionId ? { ...sess, responseLanguage } : sess,
+      ),
+    }));
+    const updated = get().sessions.find((s) => s.id === sessionId);
+    if (updated) persist("setResponseLanguage", () => getPersistenceAdapter().saveSession(updated));
   },
 
   setSummary: (sessionId, summary) => {

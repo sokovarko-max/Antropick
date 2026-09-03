@@ -41,6 +41,9 @@ export type InterviewFramework =
 
 export type SessionMode = "AUTO" | "MANUAL";
 
+/** The language the AI answers the candidate in — separate from the UI locale. */
+export type ResponseLanguage = "en" | "ru";
+
 export interface UserProfile {
   name: string;
   role: string;
@@ -110,7 +113,7 @@ export interface Session {
   endTimeMs: number | null;
   mode: SessionMode;
   modelProfileOverride: string | null;
-  responseLanguage: "en" | "ru";
+  responseLanguage: ResponseLanguage;
   responseMode: ResponseMode;
   framework: InterviewFramework;
   userInstructions: string;

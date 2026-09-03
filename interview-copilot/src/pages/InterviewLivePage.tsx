@@ -9,7 +9,8 @@ import { estimateCostUsd } from "@/services/session/CostMonitor";
 import { OverlayPanel } from "@/components/OverlayPanel";
 import { captureScreenshot } from "@/services/capture/screenshot";
 import { useDesktopHotkeys } from "@/services/runtime/useDesktopHotkeys";
-import type { AIResponseRecord, TranscriptSegment } from "@/types";
+import { useTranslation } from "@/i18n/useTranslation";
+import type { AIResponseRecord, ResponseLanguage, TranscriptSegment } from "@/types";
 
 export function InterviewLivePage() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -20,6 +21,8 @@ export function InterviewLivePage() {
   const appendAiResponse = useSessionStore((s) => s.appendAiResponse);
   const endSession = useSessionStore((s) => s.endSession);
   const documentChunks = useSessionStore((s) => s.documentChunks);
+  const setResponseLanguage = useSessionStore((s) => s.setResponseLanguage);
+  const { t } = useTranslation();
 
   const overlay = useOverlayStore();
   const [isListening, setIsListening] = useState(false);
@@ -56,6 +59,12 @@ export function InterviewLivePage() {
   useEffect(() => {
     pipelineRef.current = pipeline;
   }, [pipeline]);
+
+  // The pipeline is built once per session id and keeps the transcript, so a
+  // language change has to be pushed into it rather than rebuilding it.
+  useEffect(() => {
+    if (session) pipeline?.setResponseLanguage(session.responseLanguage);
+  }, [pipeline, session?.responseLanguage, session]);
 
   useEffect(() => {
     if (!session) return;
@@ -134,9 +143,25 @@ export function InterviewLivePage() {
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col items-center gap-6">
-      <div className="w-full">
-        <h1 className="text-xl font-semibold text-ink">{session.title}</h1>
-        <p className="text-sm text-ink-muted">{session.company}</p>
+      <div className="flex w-full items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-semibold text-ink">{session.title}</h1>
+          <p className="text-sm text-ink-muted">{session.company}</p>
+        </div>
+        {/* Changeable mid-session: the language is chosen when the session is
+            created, and without this a session started on the wrong one
+            answered in that language until it ended. */}
+        <label className="flex items-center gap-2 text-xs text-ink-muted">
+          {t("live.answerLanguage")}
+          <select
+            value={session.responseLanguage}
+            onChange={(e) => setResponseLanguage(session.id, e.target.value as ResponseLanguage)}
+            className="input w-28 py-1 text-xs"
+          >
+            <option value="en">English</option>
+            <option value="ru">Русский</option>
+          </select>
+        </label>
       </div>
 
       <div className="flex w-full gap-3">

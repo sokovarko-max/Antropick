@@ -32,6 +32,7 @@ export class VisionService {
         },
       ],
       image: { base64: input.imageBase64, mediaType: input.mediaType },
+      responseLanguage: input.responseLanguage,
     });
     return response.text;
   }

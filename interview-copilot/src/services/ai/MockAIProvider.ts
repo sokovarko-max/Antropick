@@ -47,9 +47,12 @@ export class MockAIProvider implements AIProvider {
     };
   }
 
-  async analyzeImage(_request: AIVisionRequest): Promise<AIResponse> {
+  async analyzeImage(request: AIVisionRequest): Promise<AIResponse> {
     return {
-      text: "ANSWER:\nThis looks like a coding/whiteboard screenshot (demo mode — no real vision call).\n\nKEY POINTS:\n- Demo mode is active\n- Connect a real API key in Settings to analyze real screenshots",
+      text:
+        request.responseLanguage === "ru"
+          ? "ОТВЕТ:\nПохоже на скриншот с кодом или доской (демо-режим — реального обращения к модели не было).\n\nКЛЮЧЕВЫЕ ПУНКТЫ:\n- Демо-режим активен\n- Добавьте настоящий API-ключ в настройках, чтобы разбирать реальные скриншоты"
+          : "ANSWER:\nThis looks like a coding/whiteboard screenshot (demo mode — no real vision call).\n\nKEY POINTS:\n- Demo mode is active\n- Connect a real API key in Settings to analyze real screenshots",
       usage: { inputTokens: 0, outputTokens: 0 },
       modelId: MOCK_MODEL_ID,
       stopReason: "end_turn",
@@ -86,6 +89,12 @@ function mockTextFor(request: AIGenerateRequest): string {
       weakestAnswers: [],
       recommendations: ["Connect a real API key to get a real analysis"],
     });
+  }
+  // The canned answer is the one thing a demo user reads, so it follows the
+  // session's language like a real answer would. Hardcoding English here is
+  // why the language switch looked broken to anyone without an API key.
+  if (request.responseLanguage === "ru") {
+    return "ОТВЕТ:\nЭто ответ демо-режима — API-ключ не настроен. В реальном ответе делайте упор на конкретные измеримые результаты из своего опыта.\n\nКЛЮЧЕВЫЕ ПУНКТЫ:\n- Демо-режим активен\n- Добавьте API-ключ в настройках, чтобы получать настоящие подсказки\n- Никогда не выдумывайте опыт, которого у кандидата нет";
   }
   return "ANSWER:\nThis is a demo-mode response — no API key is configured. Focus your real answer on concrete, measurable outcomes from your actual experience.\n\nKEY POINTS:\n- Demo mode active\n- Connect an API key in Settings for real suggestions\n- Never invent experience the candidate doesn't have";
 }

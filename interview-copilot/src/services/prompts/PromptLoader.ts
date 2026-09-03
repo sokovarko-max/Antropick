@@ -6,8 +6,9 @@ import summary from "../../../prompts/summary.md?raw";
 
 export type PromptName = "realtime" | "question-detector" | "vision" | "analysis" | "summary";
 
-/** The language the model should answer the candidate in. */
-export type ResponseLanguage = "en" | "ru";
+import type { ResponseLanguage } from "@/types";
+
+export type { ResponseLanguage };
 
 /**
  * Names the language for a prompt. Written out in English because that is

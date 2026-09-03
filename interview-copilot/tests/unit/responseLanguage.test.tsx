@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 import { NewSessionPage } from "@/pages/NewSessionPage";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { VisionService } from "@/services/vision/VisionService";
+import { MockAIProvider } from "@/services/ai/MockAIProvider";
+import { RealtimePipeline } from "@/services/session/RealtimePipeline";
 import { SessionAnalysisService } from "@/services/session/SessionAnalysisService";
 import { languageName, loadPrompt } from "@/services/prompts/PromptLoader";
 import type { AIProvider, AIResponse } from "@/services/ai/types";
@@ -144,5 +146,86 @@ describe("new sessions", () => {
     useSettingsStore.setState({ locale: "en" });
     renderNewSession();
     expect(languageSelect().value).toBe("en");
+  });
+});
+
+describe("demo-mode answers", () => {
+  const request = (responseLanguage?: "en" | "ru") => ({
+    taskType: "REALTIME" as const,
+    systemPrompt: "Response language: Russian",
+    messages: [{ role: "user" as const, content: "расскажите о себе" }],
+    responseLanguage,
+  });
+
+  it("answers in Russian when the session asks for Russian", async () => {
+    // The reported "answers still come back in English": every fix so far
+    // acted on the prompt, and the mock provider does not read prompts at
+    // all — so with no API key the language switch changed nothing a user
+    // could see.
+    const response = await new MockAIProvider().generate(request("ru"));
+    expect(response.text).toContain("ОТВЕТ:");
+    expect(response.text).not.toContain("ANSWER:");
+  });
+
+  it("still answers in English when that is what was asked", async () => {
+    const response = await new MockAIProvider().generate(request("en"));
+    expect(response.text).toContain("ANSWER:");
+    expect(response.text).not.toContain("ОТВЕТ:");
+  });
+
+  it("does not guess a language from the prompt text when none was given", async () => {
+    // The system prompt above says Russian; without the explicit field the
+    // mock must not infer it, or the contract becomes prompt-scraping.
+    const response = await new MockAIProvider().generate(request(undefined));
+    expect(response.text).toContain("ANSWER:");
+  });
+
+  it("answers a screenshot in the session's language too", async () => {
+    const response = await new MockAIProvider().analyzeImage({
+      ...request("ru"),
+      taskType: "VISION",
+      image: { base64: "AAAA", mediaType: "image/png" as const },
+    });
+    expect(response.text).toContain("ОТВЕТ:");
+  });
+
+  it("keeps machine-read answers as JSON, not prose in either language", async () => {
+    // QUESTION_DETECTION is parsed, never shown, so translating it would
+    // break the detector rather than help anyone.
+    const response = await new MockAIProvider().generate({
+      ...request("ru"),
+      taskType: "QUESTION_DETECTION",
+    });
+    expect(() => JSON.parse(response.text)).not.toThrow();
+  });
+});
+
+describe("changing the language of a running session", () => {
+  it("takes effect without discarding the transcript", () => {
+    // The pipeline is built once per session id on purpose; re-creating it to
+    // pick up a new language would throw away everything said so far.
+    const session = {
+      id: "s1",
+      responseLanguage: "en" as const,
+      responseMode: "SHORT" as const,
+      framework: "NONE" as const,
+      mode: "MANUAL" as const,
+      userInstructions: "",
+    };
+    const pipeline = new RealtimePipeline(
+      session as never,
+      { modelRouter: { resolveProfile: () => ({ modelId: "m" }) } } as never,
+      {} as never,
+    );
+    pipeline.transcript.append({
+      speaker: "INTERVIEWER",
+      text: "tell me about yourself",
+      timestampMs: 1,
+      confidence: 1,
+    });
+
+    pipeline.setResponseLanguage("ru");
+
+    expect(pipeline.transcript.all()).toHaveLength(1);
   });
 });

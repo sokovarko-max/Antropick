@@ -5,6 +5,7 @@ import { parseAnswerFormat } from "@/utils/parseAnswerFormat";
 import { estimateCostUsd } from "./CostMonitor";
 import type {
   DocumentChunk,
+  ResponseLanguage,
   InterviewFramework,
   ResponseMode,
   Session,
@@ -35,6 +36,13 @@ export class RealtimePipeline {
   private resumeChunks: DocumentChunk[] = [];
   private jobDescriptionChunks: DocumentChunk[] = [];
   private relevanceThreshold = 0.6;
+  /**
+   * Held separately from `session` so it can change mid-interview. The
+   * pipeline is deliberately not rebuilt when the session object changes —
+   * that would throw away the transcript — so reading the language off the
+   * constructor's snapshot would pin it to whatever it was at the start.
+   */
+  private responseLanguage: ResponseLanguage;
 
   constructor(
     private readonly session: Session,
@@ -42,6 +50,11 @@ export class RealtimePipeline {
     private readonly callbacks: RealtimePipelineCallbacks,
   ) {
     this.transcript = new TranscriptEngine(session.id);
+    this.responseLanguage = session.responseLanguage;
+  }
+
+  setResponseLanguage(language: ResponseLanguage): void {
+    this.responseLanguage = language;
   }
 
   setDocumentChunks(resume: DocumentChunk[], jobDescription: DocumentChunk[]): void {
@@ -94,7 +107,7 @@ export class RealtimePipeline {
     const systemPrompt = buildRealtimeSystemPrompt(
       this.session.responseMode,
       this.session.framework,
-      this.session.responseLanguage,
+      this.responseLanguage,
     );
     const userPrompt = buildRealtimeUserPrompt(context);
 
@@ -111,6 +124,7 @@ export class RealtimePipeline {
         taskType: "REALTIME",
         systemPrompt,
         messages: [{ role: "user", content: userPrompt }],
+        responseLanguage: this.responseLanguage,
       })) {
         if (!chunk.done) {
           fullText += chunk.delta;

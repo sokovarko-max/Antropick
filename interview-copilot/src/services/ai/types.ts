@@ -1,4 +1,5 @@
 import type { TaskType } from "@/config/models";
+import type { ResponseLanguage } from "@/types";
 
 export interface AIMessage {
   role: "user" | "assistant";
@@ -16,6 +17,14 @@ export interface AIGenerateRequest {
   messages: AIMessage[];
   maxTokens?: number;
   temperature?: number;
+  /**
+   * The language the answer must come back in. Real providers are already
+   * told this inside `systemPrompt` and ignore the field; it exists so a
+   * provider that does not read prompts at all — the demo-mode mock — can
+   * still honour the setting. Without it, demo answers were hardcoded
+   * English and the language switch appeared to do nothing.
+   */
+  responseLanguage?: ResponseLanguage;
 }
 
 export interface AIVisionRequest extends AIGenerateRequest {
