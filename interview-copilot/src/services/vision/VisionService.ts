@@ -1,11 +1,16 @@
 import type { AIProvider } from "@/services/ai/types";
-import { loadPrompt } from "@/services/prompts/PromptLoader";
+import { languageName, loadPrompt, type ResponseLanguage } from "@/services/prompts/PromptLoader";
 import type { TranscriptSegment } from "@/types";
 
 export interface AnalyzeScreenshotInput {
   imageBase64: string;
   mediaType: "image/png" | "image/jpeg" | "image/webp";
   recentTranscript: TranscriptSegment[];
+  /**
+   * Taken from the session rather than the UI locale, so a screenshot answer
+   * comes back in the same language as the spoken-question answers beside it.
+   */
+  responseLanguage: ResponseLanguage;
 }
 
 export class VisionService {
@@ -15,7 +20,9 @@ export class VisionService {
     const transcriptText = input.recentTranscript.map((s) => `${s.speaker}: ${s.text}`).join("\n");
     const response = await this.provider.analyzeImage({
       taskType: "VISION",
-      systemPrompt: loadPrompt("vision"),
+      systemPrompt: loadPrompt("vision", {
+        responseLanguage: languageName(input.responseLanguage),
+      }),
       messages: [
         {
           role: "user",

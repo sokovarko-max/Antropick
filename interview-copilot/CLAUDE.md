@@ -67,7 +67,8 @@ webkit2gtk/soup are Tauri's; pipewire/gbm/wayland/xcb are `xcap`'s (screen captu
 **Still unproven — needs a real Windows machine:**
 - Microphone / system-audio (WASAPI loopback) capture against real devices.
 - Global hotkeys actually firing system-wide.
-- Windows Credential Manager round-trip for the API key.
+- Windows Credential Manager round-trip for the API key. (The crate-level cause of the earlier "key won't save" failure is fixed and covered by a compile guard plus `security::tests`; the live round-trip against the real Credential Manager still needs Windows.)
+- The tray icon: restoring the window by clicking it, the Show/Quit menu, and close-to-tray.
 - `pnpm tauri build` producing and running a signed installer.
 - Any call against the real Anthropic API (no key here), so latency targets in `docs/requirements.md` are still design targets, not measurements.
 

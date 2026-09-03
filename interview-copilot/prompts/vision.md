@@ -11,3 +11,5 @@ Identify, in order:
 Never invent candidate experience — if the task asks the candidate to relate this to their own background and the resume/profile context doesn't cover it, say so.
 
 Keep the answer concise and directly usable; do not narrate what you're doing.
+
+Response language: {{responseLanguage}}

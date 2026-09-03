@@ -2,7 +2,9 @@
 
 ## Secrets
 - The Anthropic API key is **never** written to source, `.env` in production builds, SQLite, or a plain JSON settings file.
-- Storage: Windows Credential Manager via Rust (`keyring` crate, which wraps the Windows Credential Manager API on Windows). Accessed only through two Tauri commands: `secure_store_set` / `secure_store_get`. The frontend holds the key in memory only for the duration of an in-flight request; it is never put in Zustand persisted state, `localStorage`, or logs.
+- Storage: Windows Credential Manager via Rust (`keyring` crate, which wraps the Windows Credential Manager API on Windows). Accessed only through two Tauri commands: `secure_store_set` / `secure_store_get`.
+  - The `secure-store-native` Cargo feature (on by default) forwards keyring's platform-store features and **must stay enabled**. Without it keyring silently resolves to its in-memory `mock` store, where every `Entry::new` gets its own empty credential: writes appear to succeed, reads return nothing, and the API key is unusable. `src-tauri/src/security/mod.rs` fails the build on Windows if the feature is off, and `secure_store_is_persistent` lets the UI warn on platforms where no native store is linked in.
+  - `secure_store_set` reads the value back before reporting success, so a store that accepts a write and loses it cannot leave the UI showing a saved key that does not exist. The frontend holds the key in memory only for the duration of an in-flight request; it is never put in Zustand persisted state, `localStorage`, or logs.
 - `.env.example` documents variable names only, with empty values.
 
 ## Logging

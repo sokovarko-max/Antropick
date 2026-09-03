@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSessionStore } from "@/stores/sessionStore";
+import { useSettingsStore } from "@/stores/settingsStore";
 import type { InterviewFramework, ResponseMode, SessionMode } from "@/types";
 import { DocumentUploader } from "@/features/documents/DocumentUploader";
 import { useTranslation } from "@/i18n/useTranslation";
@@ -25,7 +26,11 @@ export function NewSessionPage() {
   const [role, setRole] = useState("");
   const [company, setCompany] = useState("");
   const [userInstructions, setUserInstructions] = useState("");
-  const [responseLanguage, setResponseLanguage] = useState<"en" | "ru">("en");
+  // Defaults to the language the app is being used in. Hardcoding "en" here
+  // meant switching the app to Russian changed every label but left the AI
+  // answering in English, with the mismatch buried in this one form field.
+  const appLocale = useSettingsStore((s) => s.locale);
+  const [responseLanguage, setResponseLanguage] = useState<"en" | "ru">(appLocale);
   const [responseMode, setResponseMode] = useState<ResponseMode>("SHORT");
   const [framework, setFramework] = useState<InterviewFramework>("NONE");
   const [mode, setMode] = useState<SessionMode>("AUTO");

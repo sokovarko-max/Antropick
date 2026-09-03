@@ -87,5 +87,12 @@
   "settings.ai.hint.anthropic": "Paid per token, no free tier. An hour-long interview typically costs well under $1. Get a key at",
   "settings.ai.hint.groq": "Free tier, no credit card: 30 requests/min. Fastest responses of the options here. Get a key at",
   "settings.ai.groqVisionPreview": "Note: Groq serves the vision model as preview-tier, so Ctrl+B screenshot analysis may be less reliable than the text features.",
-  "aiError.anthropicBillingNote": "Note: API credits are billed separately from a Claude Pro/Max subscription."
+  "aiError.anthropicBillingNote": "Note: API credits are billed separately from a Claude Pro/Max subscription.",
+  "overlay.action.clear": "Clear",
+  "settings.ai.keyStored": "An API key is saved for {provider}.",
+  "settings.ai.keyStoredPlaceholder": "A key is saved — type a new one to replace it",
+  "settings.ai.saveWithoutTesting": "Save without testing",
+  "settings.ai.removeKey": "Remove key",
+  "settings.ai.keySaved": "Key saved. It was not tested against the provider — use Test Connection to check it works.",
+  "settings.ai.storageNotPersistent": "This build has no OS credential store, so a saved key is kept in memory only and is lost when the app closes. Use the Windows build for a key that persists."
 }

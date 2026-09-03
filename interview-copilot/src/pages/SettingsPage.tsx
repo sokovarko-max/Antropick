@@ -1,8 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { createAIProvider } from "@/services/runtime/AppServices";
 import { AIProviderError, type AIErrorCode } from "@/services/ai/types";
-import { apiKeyStorageKey, secureStoreSet } from "@/services/security/secureStore";
+import {
+  apiKeyStorageKey,
+  secureStoreDelete,
+  secureStoreIsPersistent,
+  secureStoreSet,
+} from "@/services/security/secureStore";
 import { MODEL_PROFILES, PROVIDERS, type ProviderId } from "@/config/models";
 import { OverlayPanel } from "@/components/OverlayPanel";
 import { useTranslation } from "@/i18n/useTranslation";
@@ -21,12 +26,69 @@ export function SettingsPage() {
     detail: string;
   } | null>(null);
   const [demoModeTurnedOff, setDemoModeTurnedOff] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [storageIsPersistent, setStorageIsPersistent] = useState(true);
   const { t } = useTranslation();
+  const keyIsStored = settings.apiKeyPresent[settings.aiProvider];
+
+  useEffect(() => {
+    // Checked rather than assumed: a build whose credential store is in-memory
+    // accepts a key and loses it at exit, and telling the user it was saved is
+    // worse than telling them it can't be.
+    void secureStoreIsPersistent().then(setStorageIsPersistent);
+  }, []);
+
+  /**
+   * Persists the key and clears whatever was standing in the way of using it.
+   * Demo mode defaults to on and is persisted, so a stored key alone still
+   * produces canned answers — that is the "I added a key and nothing changed"
+   * report.
+   */
+  async function storeKey(): Promise<void> {
+    await secureStoreSet(apiKeyStorageKey(settings.aiProvider), apiKeyInput);
+    settings.setApiKeyPresent(settings.aiProvider, true);
+    setApiKeyInput("");
+    if (settings.demoMode) {
+      settings.setDemoMode(false);
+      setDemoModeTurnedOff(true);
+    }
+  }
+
+  /**
+   * Saves without calling the vendor. Requiring a successful live test to
+   * persist anything meant a user whose account was rate-limited, out of
+   * credit, or behind a flaky network could not save a valid key at all.
+   */
+  async function handleSaveKey() {
+    setTesting(true);
+    setConnectionError(null);
+    setDemoModeTurnedOff(false);
+    setSaved(false);
+    try {
+      await storeKey();
+      setSaved(true);
+    } catch (error) {
+      setConnectionError({
+        code: "UNKNOWN",
+        detail: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setTesting(false);
+    }
+  }
+
+  async function handleRemoveKey() {
+    await secureStoreDelete(apiKeyStorageKey(settings.aiProvider));
+    settings.setApiKeyPresent(settings.aiProvider, false);
+    settings.setConnectionStatus("UNKNOWN");
+    setSaved(false);
+  }
 
   async function handleTestConnection() {
     setTesting(true);
     setConnectionError(null);
     setDemoModeTurnedOff(false);
+    setSaved(false);
     settings.setConnectionStatus("UNKNOWN");
     try {
       // Validate before storing: writing first meant a typo'd key overwrote a
@@ -38,17 +100,10 @@ export function SettingsPage() {
         messages: [{ role: "user", content: "ping" }],
         maxTokens: 5,
       });
-      await secureStoreSet(apiKeyStorageKey(settings.aiProvider), apiKeyInput);
-      settings.setConnectionStatus("CONNECTED");
-      settings.setApiKeyPresent(settings.aiProvider, true);
       // A key that just answered a live request is unambiguous intent to stop
-      // using mock answers. Demo mode defaults to on and is persisted, so
-      // without this the app keeps serving canned text after a successful
-      // test and looks like the key did nothing.
-      if (settings.demoMode) {
-        settings.setDemoMode(false);
-        setDemoModeTurnedOff(true);
-      }
+      // using mock answers, so storeKey also clears the demo-mode switch.
+      await storeKey();
+      settings.setConnectionStatus("CONNECTED");
     } catch (error) {
       // Surface the real reason — a silent "not connected" with no detail is
       // exactly what let a real bug (SDK refusing to run in a WebView) go
@@ -142,6 +197,12 @@ export function SettingsPage() {
               <span className="text-ink-muted">{PROVIDERS[settings.aiProvider].consoleUrl}</span>
             </p>
 
+            {!storageIsPersistent && (
+              <p className="rounded-lg bg-state-error/10 px-3 py-2 text-sm text-state-error">
+                {t("settings.ai.storageNotPersistent")}
+              </p>
+            )}
+
             <label className="block space-y-1.5">
               <span className="text-sm font-medium text-ink-muted">{t("settings.ai.apiKey")}</span>
               <input
@@ -149,10 +210,20 @@ export function SettingsPage() {
                 value={apiKeyInput}
                 onChange={(e) => setApiKeyInput(e.target.value)}
                 className="input"
-                placeholder={settings.aiProvider === "groq" ? "gsk_..." : "sk-ant-..."}
+                // A stored key is never read back into the field — the
+                // placeholder is the only thing that reports it, so the real
+                // secret stays out of the DOM.
+                placeholder={
+                  keyIsStored
+                    ? t("settings.ai.keyStoredPlaceholder")
+                    : settings.aiProvider === "groq"
+                      ? "gsk_..."
+                      : "sk-ant-..."
+                }
               />
             </label>
-            <div className="flex items-center gap-3">
+
+            <div className="flex flex-wrap items-center gap-3">
               <button
                 onClick={handleTestConnection}
                 disabled={testing || !apiKeyInput}
@@ -160,6 +231,21 @@ export function SettingsPage() {
               >
                 {testing ? t("settings.ai.testing") : t("settings.ai.testConnection")}
               </button>
+              <button
+                onClick={handleSaveKey}
+                disabled={testing || !apiKeyInput}
+                className="rounded-lg border border-surface-border px-4 py-2 text-sm font-medium text-ink hover:bg-surface-raised disabled:opacity-50"
+              >
+                {t("settings.ai.saveWithoutTesting")}
+              </button>
+              {keyIsStored && (
+                <button
+                  onClick={() => void handleRemoveKey()}
+                  className="rounded-lg px-3 py-2 text-sm text-state-error hover:bg-state-error/10"
+                >
+                  {t("settings.ai.removeKey")}
+                </button>
+              )}
               <span
                 className={`text-sm ${
                   settings.connectionStatus === "CONNECTED" ? "text-state-listening" : "text-ink-muted"
@@ -172,6 +258,16 @@ export function SettingsPage() {
                     : ""}
               </span>
             </div>
+            {keyIsStored && (
+              <p className="text-sm text-state-listening">
+                ● {t("settings.ai.keyStored", { provider: PROVIDERS[settings.aiProvider].label })}
+              </p>
+            )}
+            {saved && (
+              <p className="rounded-lg bg-state-listening/10 px-3 py-2 text-sm text-state-listening">
+                {t("settings.ai.keySaved")}
+              </p>
+            )}
             {demoModeTurnedOff && (
               <p className="rounded-lg bg-state-listening/10 px-3 py-2 text-sm text-state-listening">
                 {t("settings.ai.demoModeTurnedOff")}

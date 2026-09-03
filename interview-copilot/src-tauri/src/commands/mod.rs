@@ -18,7 +18,22 @@ pub fn secure_store_set(key: String, value: String) -> Result<(), String> {
     if key.is_empty() {
         return Err("key must not be empty".into());
     }
-    security::set(&key, &value).map_err(|e| e.to_string())
+    security::set(&key, &value).map_err(|e| e.to_string())?;
+    // Read back before reporting success. A store that accepts a write and
+    // returns nothing afterwards would otherwise leave the UI showing a
+    // saved key that does not exist.
+    match security::get(&key) {
+        Ok(Some(stored)) if stored == value => Ok(()),
+        Ok(_) => Err("the credential store did not keep the value that was just written".into()),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+/// Whether a stored credential outlives the process. The frontend warns
+/// instead of claiming a key is saved when this is false.
+#[tauri::command]
+pub fn secure_store_is_persistent() -> bool {
+    security::is_persistent()
 }
 
 #[tauri::command]

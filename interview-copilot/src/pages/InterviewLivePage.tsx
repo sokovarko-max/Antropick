@@ -84,6 +84,9 @@ export function InterviewLivePage() {
       setIsListening(false);
       overlay.setState("IDLE");
     } else {
+      // Starting a new stretch of listening clears whatever answer was left
+      // on the panel from before, so the first thing shown belongs to now.
+      overlay.reset();
       await services.sttProvider.start();
       setIsListening(true);
       overlay.setState("LISTENING");
@@ -107,6 +110,7 @@ export function InterviewLivePage() {
         imageBase64: screenshot.base64,
         mediaType: "image/png",
         recentTranscript: pipelineRef.current?.transcript.recentWindow(60_000) ?? [],
+        responseLanguage: session.responseLanguage,
       });
       const parsed = parseAnswerFormat(answer);
       overlay.setAnswer(parsed.answer, parsed.keyPoints);

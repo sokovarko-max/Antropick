@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { AIProvider } from "@/services/ai/types";
-import { loadPrompt } from "@/services/prompts/PromptLoader";
+import { languageName, loadPrompt, type ResponseLanguage } from "@/services/prompts/PromptLoader";
 import type { AIResponseRecord, SessionAnalysis, TranscriptSegment } from "@/types";
 
 const analysisSchema = z.object({
@@ -36,13 +36,16 @@ export class SessionAnalysisService {
     sessionId: string,
     transcript: TranscriptSegment[],
     aiResponses: AIResponseRecord[],
+    responseLanguage: ResponseLanguage = "en",
   ): Promise<SessionAnalysis> {
     const transcriptText = transcript.map((s) => `[${s.speaker}] ${s.text}`).join("\n");
     const responsesText = aiResponses.map((r) => `Q-context prompt: ${r.prompt}\nSuggested: ${r.answer}`).join("\n---\n");
 
     const response = await this.provider.generate({
       taskType: "SESSION_ANALYSIS",
-      systemPrompt: loadPrompt("analysis"),
+      systemPrompt: loadPrompt("analysis", {
+        responseLanguage: languageName(responseLanguage),
+      }),
       messages: [
         {
           role: "user",

@@ -20,7 +20,11 @@ export function OverlayPanel({
   opacityOverride,
 }: OverlayPanelProps) {
   const { t } = useTranslation();
-  const { state, question, answer, keyPoints, errorMessage, isPaused } = useOverlayStore();
+  const { state, question, answer, keyPoints, errorMessage, isPaused, reset } = useOverlayStore();
+  // Nothing else clears the panel: the last question and answer stayed on
+  // screen until another one replaced it, so a one-off screenshot answer sat
+  // there for the rest of the session.
+  const hasContent = question !== null || answer !== "" || errorMessage !== null;
   const storedOpacity = useSettingsStore((s) => s.overlayOpacity);
   // The overlay window itself is transparent (see tauri.conf.json), so fading
   // the panel genuinely reveals the call behind it rather than blending into
@@ -53,6 +57,16 @@ export function OverlayPanel({
           >
             {isPaused ? "▶" : t("overlay.action.pause")}
           </button>
+          {hasContent && (
+            <button
+              onClick={reset}
+              title={t("overlay.action.clear")}
+              aria-label={t("overlay.action.clear")}
+              className="rounded-lg bg-surface-border px-2.5 py-1 text-xs font-medium text-ink hover:bg-surface-border/70"
+            >
+              ✕
+            </button>
+          )}
           <button
             onClick={onHide}
             className="rounded-lg bg-surface-border px-2.5 py-1 text-xs font-medium text-ink hover:bg-surface-border/70"

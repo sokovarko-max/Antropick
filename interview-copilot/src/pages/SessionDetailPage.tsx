@@ -35,7 +35,12 @@ export function SessionDetailPage() {
   async function handleAnalyze() {
     setAnalyzing(true);
     try {
-      const result = await services.sessionAnalysisService.analyze(sessionId!, transcript, aiResponses);
+      const result = await services.sessionAnalysisService.analyze(
+        sessionId!,
+        transcript,
+        aiResponses,
+        session!.responseLanguage,
+      );
       setAnalysis(result);
     } finally {
       setAnalyzing(false);

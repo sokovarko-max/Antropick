@@ -36,6 +36,22 @@ export async function secureStoreGet(key: string): Promise<string | null> {
   return devOnlyMemoryStore.get(key) ?? null;
 }
 
+/**
+ * Whether a stored key survives a restart. False when the Rust side had to
+ * fall back to an in-memory store, and outside Tauri (the dev-only Map above).
+ * The UI warns instead of reporting a key as saved.
+ */
+export async function secureStoreIsPersistent(): Promise<boolean> {
+  if (!isTauri) return false;
+  try {
+    return await tauriInvoke<boolean>("secure_store_is_persistent");
+  } catch {
+    // An older build without the command: assume the worst and warn, rather
+    // than claim durability that cannot be checked.
+    return false;
+  }
+}
+
 export async function secureStoreDelete(key: string): Promise<void> {
   if (isTauri) {
     await tauriInvoke("secure_store_delete", { key });
