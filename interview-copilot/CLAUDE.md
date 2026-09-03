@@ -63,12 +63,12 @@ webkit2gtk/soup are Tauri's; pipewire/gbm/wayland/xcb are `xcap`'s (screen captu
 - Frontend: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all clean.
 - Rust: `cargo check`, `cargo clippy --all-targets`, and `cargo test` all clean — the crate compiles and its DSP tests pass. `cargo check --target x86_64-pc-windows-msvc` also type-checks the screen-capture path against the real Windows target (the full Windows check needs an MSVC toolchain for bundled SQLite's C code, which this container lacks).
 - Demo mode drives the whole UI end to end in a headless browser, including session history surviving a reload.
+- Windows Credential Manager set/get/delete, via `cargo test` on `windows-latest` (`security::tests::round_trip_matches_what_is_persistent_reports` takes its persistent branch there and round-trips through the real store). The `secure-store-native` feature must stay on for this: without it keyring silently uses an in-memory store and the API key is lost, which is what previously made the app unable to leave demo mode. A `compile_error!` on Windows enforces it.
 
 **Still unproven — needs a real Windows machine:**
 - Microphone / system-audio (WASAPI loopback) capture against real devices.
 - Global hotkeys actually firing system-wide.
-- Windows Credential Manager round-trip for the API key. (The crate-level cause of the earlier "key won't save" failure is fixed and covered by a compile guard plus `security::tests`; the live round-trip against the real Credential Manager still needs Windows.)
-- The tray icon: restoring the window by clicking it, the Show/Quit menu, and close-to-tray.
+- The tray icon: restoring the window by clicking it, the Show/Quit menu, and close-to-tray. The code compiles and bundles on Windows, but nothing here can click a tray icon.
 - `pnpm tauri build` producing and running a signed installer.
 - Any call against the real Anthropic API (no key here), so latency targets in `docs/requirements.md` are still design targets, not measurements.
 
