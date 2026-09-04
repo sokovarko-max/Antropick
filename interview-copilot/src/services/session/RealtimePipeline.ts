@@ -3,6 +3,7 @@ import { TranscriptEngine } from "./TranscriptEngine";
 import { loadPrompt } from "@/services/prompts/PromptLoader";
 import { parseAnswerFormat } from "@/utils/parseAnswerFormat";
 import { estimateCostUsd } from "./CostMonitor";
+import { AIProviderError, type AIErrorCode } from "@/services/ai/types";
 import type {
   DocumentChunk,
   ResponseLanguage,
@@ -23,7 +24,12 @@ export interface RealtimePipelineCallbacks {
     outputTokens: number;
     modelId: string;
   }) => void;
-  onError: (message: string) => void;
+  /**
+   * `code` classifies the failure so the UI can show copy a user can act on.
+   * The raw `message` is the vendor's body — useful in a details pane, never
+   * as the thing shown mid-interview.
+   */
+  onError: (error: { code: AIErrorCode; message: string }) => void;
 }
 
 /**
@@ -139,7 +145,10 @@ export class RealtimePipeline {
       }
       this.callbacks.onAnswerComplete({ prompt: userPrompt, fullText, inputTokens, outputTokens, modelId });
     } catch (error) {
-      this.callbacks.onError(error instanceof Error ? error.message : "AI provider unavailable");
+      this.callbacks.onError({
+        code: error instanceof AIProviderError ? error.code : "UNKNOWN",
+        message: error instanceof Error ? error.message : "AI provider unavailable",
+      });
     }
   }
 }

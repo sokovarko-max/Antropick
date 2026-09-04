@@ -8,6 +8,12 @@ import type {
 } from "./types";
 import { AIProviderError, type AIErrorCode } from "./types";
 
+export interface RetryNotice {
+  attempt: number;
+  waitMs: number;
+  code: AIErrorCode;
+}
+
 export interface OpenAICompatibleOptions {
   providerId: ProviderId;
   apiKey: string;
@@ -15,6 +21,22 @@ export interface OpenAICompatibleOptions {
   profiles?: Record<TaskType, ModelProfile>;
   /** Injectable for tests. */
   fetchImpl?: typeof fetch;
+  /**
+   * Called before each wait, so the UI can say the request is being retried
+   * instead of appearing to hang for the length of a rate limit.
+   */
+  onRetry?: (notice: RetryNotice) => void;
+}
+
+/**
+ * Longer than this and the wait is worse than the failure: an interview does
+ * not pause for half a minute, and the candidate needs to know to carry on
+ * unaided. Groq's free-tier waits are typically well inside it.
+ */
+const MAX_RETRY_WAIT_MS = 20_000;
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 interface ChatMessage {
@@ -38,6 +60,7 @@ export class OpenAICompatibleProvider implements AIProvider {
   private readonly baseUrl: string;
   private readonly profiles: Record<TaskType, ModelProfile>;
   private readonly fetchImpl: typeof fetch;
+  private readonly onRetry?: (notice: RetryNotice) => void;
 
   constructor(options: OpenAICompatibleOptions) {
     this.id = options.providerId;
@@ -45,6 +68,7 @@ export class OpenAICompatibleProvider implements AIProvider {
     this.baseUrl = options.baseUrl.replace(/\/$/, "");
     this.profiles = options.profiles ?? MODEL_PROFILES[options.providerId];
     this.fetchImpl = options.fetchImpl ?? globalThis.fetch.bind(globalThis);
+    this.onRetry = options.onRetry;
   }
 
   async generate(request: AIGenerateRequest): Promise<AIResponse> {
@@ -166,7 +190,42 @@ export class OpenAICompatibleProvider implements AIProvider {
     return response.json();
   }
 
+  /**
+   * Sends the request, waiting out a rate limit rather than surfacing it.
+   *
+   * Groq's free tier caps output tokens per minute, and it answers with the
+   * exact wait ("try again in 17.099s"). Reporting that to a candidate
+   * mid-interview is useless — they cannot act on it, and the answer they
+   * needed is simply lost. Waiting the vendor's own figure and asking again
+   * turns the common case into a pause instead of a failure.
+   *
+   * Only errors the vendor marked retryable are retried, the wait is capped
+   * so a long limit fails fast rather than hanging a live interview, and the
+   * attempt count is small: this is a stall, not a queue.
+   */
   private async request(payload: Record<string, unknown>): Promise<Response> {
+    const maxAttempts = 3;
+    let lastError: AIProviderError | undefined;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await this.attempt(payload);
+      } catch (error) {
+        if (!(error instanceof AIProviderError) || !error.retryable) throw error;
+        lastError = error;
+        if (attempt === maxAttempts) break;
+
+        // The vendor's own figure when it gave one, otherwise a plain backoff.
+        const waitMs = error.retryAfterMs ?? attempt * 1000;
+        if (waitMs > MAX_RETRY_WAIT_MS) break;
+        this.onRetry?.({ attempt, waitMs, code: error.code });
+        await delay(waitMs);
+      }
+    }
+    throw lastError ?? new AIProviderError("request failed", undefined, false, "UNKNOWN");
+  }
+
+  private async attempt(payload: Record<string, unknown>): Promise<Response> {
     let response: Response;
     try {
       response = await this.fetchImpl(`${this.baseUrl}/chat/completions`, {
@@ -195,10 +254,30 @@ export class OpenAICompatibleProvider implements AIProvider {
         undefined,
         code === "RATE_LIMITED" || code === "SERVER_ERROR",
         code,
+        retryAfterMs(response.headers.get("retry-after"), detail),
       );
     }
     return response;
   }
+}
+
+/**
+ * How long to wait before retrying, from whichever source the vendor used.
+ *
+ * The `Retry-After` header is the standard, but Groq puts the precise figure
+ * only in the message body ("Please try again in 17.099999999s"), so both are
+ * read. Returns undefined when neither says — the caller then falls back to
+ * its own backoff rather than guessing a number here.
+ */
+export function retryAfterMs(header: string | null, detail: string): number | undefined {
+  const headerSeconds = header ? Number(header) : NaN;
+  if (Number.isFinite(headerSeconds) && headerSeconds >= 0) return headerSeconds * 1000;
+
+  const match = detail.match(/try again in ([\d.]+)\s*(ms|s)\b/i);
+  if (!match) return undefined;
+  const value = Number(match[1]);
+  if (!Number.isFinite(value)) return undefined;
+  return match[2]!.toLowerCase() === "ms" ? value : value * 1000;
 }
 
 /** Shared by every OpenAI-compatible vendor — the status codes are the contract. */

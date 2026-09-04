@@ -89,3 +89,56 @@ describe("OverlayPanel clear button", () => {
     expect(screen.queryByText(/Demo mode is active/)).toBeNull();
   });
 });
+
+describe("results arriving out of order", () => {
+  it("drops a late failure that belongs to a superseded request", () => {
+    // Exactly the reported screenshot: a screenshot analysis was still in
+    // flight when a spoken question arrived, then failed — and its rate-limit
+    // error, naming the *vision* model, was rendered under the new question
+    // as though that question had failed.
+    const store = useOverlayStore.getState();
+    const screenshotRequest = store.setQuestion("Screenshot — Screen");
+    const spokenRequest = useOverlayStore.getState().setQuestion("Tell me about a project");
+
+    expect(spokenRequest).not.toBe(screenshotRequest);
+    useOverlayStore.getState().setError("rate limit on qwen", screenshotRequest);
+
+    const after = useOverlayStore.getState();
+    expect(after.errorMessage).toBeNull();
+    expect(after.state).not.toBe("ERROR");
+    expect(after.question).toBe("Tell me about a project");
+  });
+
+  it("drops a late answer from a superseded request too", () => {
+    const first = useOverlayStore.getState().setQuestion("first");
+    useOverlayStore.getState().setQuestion("second");
+    useOverlayStore.getState().setAnswer("answer to the first", ["stale"], first);
+
+    expect(useOverlayStore.getState().answer).toBe("");
+    expect(useOverlayStore.getState().keyPoints).toEqual([]);
+  });
+
+  it("shows the failure that does belong to the current request", () => {
+    const current = useOverlayStore.getState().setQuestion("current");
+    useOverlayStore.getState().setError("real failure", current);
+
+    expect(useOverlayStore.getState().errorMessage).toBe("real failure");
+    expect(useOverlayStore.getState().state).toBe("ERROR");
+  });
+
+  it("clears a previous error when the next question starts", () => {
+    // Otherwise a failure sat on the panel through the following question.
+    const first = useOverlayStore.getState().setQuestion("first");
+    useOverlayStore.getState().setError("boom", first);
+    useOverlayStore.getState().setQuestion("second");
+
+    expect(useOverlayStore.getState().errorMessage).toBeNull();
+    expect(useOverlayStore.getState().state).toBe("THINKING");
+  });
+
+  it("still accepts a result that names no request, for callers that do not track one", () => {
+    useOverlayStore.getState().setQuestion("q");
+    useOverlayStore.getState().setAnswer("plain answer", []);
+    expect(useOverlayStore.getState().answer).toBe("plain answer");
+  });
+});

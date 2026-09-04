@@ -89,6 +89,13 @@ export class AIProviderError extends Error {
     public readonly cause?: unknown,
     public readonly retryable: boolean = false,
     public readonly code: AIErrorCode = "UNKNOWN",
+    /**
+     * How long the vendor asked us to wait, when it said. Groq answers a rate
+     * limit with an exact figure ("try again in 17.099s"); waiting it out is
+     * the difference between the feature working and the candidate seeing an
+     * error mid-interview.
+     */
+    public readonly retryAfterMs?: number,
   ) {
     super(message);
     this.name = "AIProviderError";

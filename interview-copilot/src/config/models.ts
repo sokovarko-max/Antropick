@@ -73,7 +73,14 @@ export const MODEL_PROFILES: Record<ProviderId, Record<TaskType, ModelProfile>> 
     QUESTION_DETECTION: { modelId: "openai/gpt-oss-20b", maxTokens: 200, temperature: 0 },
     // gpt-oss has no vision, so screenshots need the multimodal Qwen. It is
     // Groq preview-tier rather than production — see the note in Settings.
-    VISION: { modelId: "qwen/qwen3.6-27b", maxTokens: 800, temperature: 0.3 },
+    //
+    // 450 rather than 800 because the free tier caps *output tokens per
+    // minute* at 1000 for this model, and the cap counts what a request
+    // reserves, not what it uses. At 800 a single screenshot claimed most of
+    // the minute, so the next one — or a spoken question arriving alongside
+    // it — was rejected outright. Two screenshots a minute is worth more than
+    // a longer answer nobody gets.
+    VISION: { modelId: "qwen/qwen3.6-27b", maxTokens: 450, temperature: 0.3 },
     SESSION_ANALYSIS: { modelId: "openai/gpt-oss-120b", maxTokens: 4000, temperature: 0.2 },
     CHAT: { modelId: "openai/gpt-oss-120b", maxTokens: 800, temperature: 0.5 },
     SUMMARY: { modelId: "openai/gpt-oss-20b", maxTokens: 500, temperature: 0.2 },

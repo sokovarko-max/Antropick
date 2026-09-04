@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAppServices } from "@/services/runtime/useAppServices";
 import { useSessionStore } from "@/stores/sessionStore";
@@ -10,6 +10,9 @@ import { OverlayPanel } from "@/components/OverlayPanel";
 import { captureScreenshot } from "@/services/capture/screenshot";
 import { useDesktopHotkeys } from "@/services/runtime/useDesktopHotkeys";
 import { useTranslation } from "@/i18n/useTranslation";
+import { AIProviderError, type AIErrorCode } from "@/services/ai/types";
+import { PROVIDERS } from "@/config/models";
+import type { TranslationKey } from "@/i18n";
 import type { AIResponseRecord, ResponseLanguage, TranscriptSegment } from "@/types";
 
 export function InterviewLivePage() {
@@ -24,19 +27,33 @@ export function InterviewLivePage() {
   const setResponseLanguage = useSessionStore((s) => s.setResponseLanguage);
   const { t } = useTranslation();
 
+  const aiErrorText = useCallback(
+    (code: AIErrorCode) => {
+      const provider = PROVIDERS[services.providerId as keyof typeof PROVIDERS];
+      return t(`aiError.${code}` as TranslationKey, {
+        provider: provider?.label ?? "the provider",
+        console: provider?.consoleUrl ?? "",
+      });
+    },
+    [t, services.providerId],
+  );
+
   const overlay = useOverlayStore();
   const [isListening, setIsListening] = useState(false);
   const pipelineRef = useRef<RealtimePipeline | null>(null);
+  const realtimeRequestId = useRef<number | undefined>(undefined);
 
   const pipeline = useMemo(() => {
     if (!session) return null;
     return new RealtimePipeline(session, services, {
       onSegment: (segment: TranscriptSegment) => appendTranscript(segment),
-      onTriggerStart: (segment) => overlay.setQuestion(segment.text),
+      onTriggerStart: (segment) => {
+        realtimeRequestId.current = overlay.setQuestion(segment.text);
+      },
       onAnswerDelta: (delta) => overlay.appendAnswerDelta(delta),
       onAnswerComplete: ({ prompt, fullText, inputTokens, outputTokens, modelId }) => {
         const parsed = parseAnswerFormat(fullText);
-        overlay.setAnswer(parsed.answer, parsed.keyPoints);
+        overlay.setAnswer(parsed.answer, parsed.keyPoints, realtimeRequestId.current);
         const record: AIResponseRecord = {
           id: `resp_${Date.now()}`,
           sessionId: session.id,
@@ -51,7 +68,9 @@ export function InterviewLivePage() {
         };
         appendAiResponse(record);
       },
-      onError: (message) => overlay.setError(message),
+      // The vendor's raw JSON body is not something to read mid-interview;
+      // the classified code maps to copy that says what to do about it.
+      onError: ({ code }) => overlay.setError(aiErrorText(code), realtimeRequestId.current),
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.id]);
@@ -111,10 +130,10 @@ export function InterviewLivePage() {
   /** Ctrl+B: capture the screen, send it to the vision model, show the answer. */
   async function handleScreenshot() {
     if (!session) return;
-    overlay.setQuestion("Screenshot");
+    let requestId = overlay.setQuestion("Screenshot");
     try {
       const screenshot = await captureScreenshot();
-      overlay.setQuestion(`Screenshot — ${screenshot.source}`);
+      requestId = overlay.setQuestion(`Screenshot — ${screenshot.source}`);
       const answer = await services.visionService.analyze({
         imageBase64: screenshot.base64,
         mediaType: "image/png",
@@ -122,10 +141,15 @@ export function InterviewLivePage() {
         responseLanguage: session.responseLanguage,
       });
       const parsed = parseAnswerFormat(answer);
-      overlay.setAnswer(parsed.answer, parsed.keyPoints);
+      overlay.setAnswer(parsed.answer, parsed.keyPoints, requestId);
     } catch (error) {
       overlay.setError(
-        error instanceof Error ? error.message : "Screenshot analysis failed",
+        error instanceof AIProviderError
+          ? aiErrorText(error.code)
+          : error instanceof Error
+            ? error.message
+            : t("aiError.UNKNOWN"),
+        requestId,
       );
     }
   }
