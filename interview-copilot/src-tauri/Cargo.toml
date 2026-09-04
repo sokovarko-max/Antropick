@@ -1,0 +1,60 @@
+[package]
+name = "interview-copilot"
+version = "0.1.0"
+description = "AI Interview Copilot — Windows 11 desktop app"
+edition = "2021"
+
+[lib]
+name = "interview_copilot_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[features]
+default = ["secure-store-native"]
+# Forwards keyring's platform store features so `security::mod` can assert, at
+# compile time, that a real credential store is linked in.
+#
+# This is NOT cosmetic. With no store feature enabled, keyring 3 resolves to
+# its in-memory `mock` store: `set_password` succeeds, `get_password` works
+# for the rest of the process, and the credential is gone at the next launch.
+# That is what made the API key look unsaveable and pinned the app in demo
+# mode. Linux has no entry here on purpose — this container has no libsecret,
+# so a Linux build keeps the mock store and says so in the UI.
+secure-store-native = ["keyring/windows-native", "keyring/apple-native"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+tauri-plugin-global-shortcut = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rusqlite = { version = "0.32", features = ["bundled"] }
+keyring = "3"
+cpal = "0.15"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+uuid = { version = "1", features = ["v4"] }
+thiserror = "2"
+# Screen capture. Cross-platform, so the overlay's screenshot feature is not
+# tied to Win32 — see src/capture/mod.rs.
+xcap = "0.9"
+image = { version = "0.25", default-features = false, features = ["png"] }
+base64 = "0.22"
+
+# Window translucency is a layered-window attribute, not a WebView property:
+# it has to make the frame and title bar see-through too, which CSS cannot
+# reach. Tauri exposes no wrapper, so this is the one direct Win32 call.
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
