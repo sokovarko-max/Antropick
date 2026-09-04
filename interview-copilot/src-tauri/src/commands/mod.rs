@@ -52,7 +52,7 @@ pub fn set_window_opacity(app: AppHandle, opacity: f64) -> Result<(), String> {
     if !opacity.is_finite() {
         return Err("opacity must be a finite number".into());
     }
-    crate::window::set_window_opacity(&app, opacity).map_err(|e| e.to_string())
+    crate::window::set_window_opacity(&app, opacity)
 }
 
 #[tauri::command]
