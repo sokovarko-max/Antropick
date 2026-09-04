@@ -14,6 +14,45 @@ pub fn main_window(app: &AppHandle) -> Option<WebviewWindow> {
     app.get_webview_window("main")
 }
 
+/// Makes the whole main window translucent, frame included, so the screen
+/// behind it stays readable during a call.
+///
+/// This is a layered-window attribute rather than a CSS or WebView setting:
+/// the alpha has to apply to the native frame and title bar as well, which
+/// nothing inside the page can reach. `opacity` is a fraction; it is clamped
+/// so the window can never be made invisible and therefore impossible to find
+/// and fix.
+#[cfg(target_os = "windows")]
+pub fn set_window_opacity(app: &AppHandle, opacity: f64) -> tauri::Result<()> {
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::UI::WindowsAndMessaging::{
+        GetWindowLongPtrW, SetLayeredWindowAttributes, SetWindowLongPtrW, GWL_EXSTYLE, LWA_ALPHA,
+        WS_EX_LAYERED,
+    };
+
+    let Some(window) = main_window(app) else {
+        return Ok(());
+    };
+    let hwnd = HWND(window.hwnd()?.0 as *mut std::ffi::c_void);
+    let alpha = (opacity.clamp(0.3, 1.0) * 255.0).round() as u8;
+
+    // SAFETY: `hwnd` comes from Tauri's live window handle, and both calls are
+    // plain attribute sets on it with no memory handed across the boundary.
+    unsafe {
+        let ex_style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+        SetWindowLongPtrW(hwnd, GWL_EXSTYLE, ex_style | WS_EX_LAYERED.0 as isize);
+        SetLayeredWindowAttributes(hwnd, windows::Win32::Foundation::COLORREF(0), alpha, LWA_ALPHA)?;
+    }
+    Ok(())
+}
+
+/// No-op away from Windows: the other platforms this compiles on are
+/// development hosts, and failing here would break `cargo test` on Linux.
+#[cfg(not(target_os = "windows"))]
+pub fn set_window_opacity(_app: &AppHandle, _opacity: f64) -> tauri::Result<()> {
+    Ok(())
+}
+
 /// Brings the main window back from the tray.
 ///
 /// `show` alone is not enough: a window hidden while minimized comes back

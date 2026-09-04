@@ -34,13 +34,22 @@ pub enum CaptureError {
     Failed(String),
 }
 
+/// Titles belonging to this app. Capturing one of these is never useful: the
+/// hotkey is usually pressed while the copilot itself has focus, and the model
+/// then dutifully describes the copilot's own UI instead of the interview.
+fn is_own_window(title: &str) -> bool {
+    let title = title.trim();
+    title == "Interview Copilot" || title == "Interview Copilot Overlay"
+}
+
 fn focused_window() -> Option<Window> {
     let windows = Window::all().ok()?;
-    windows
-        .into_iter()
-        .find(|window| {
-            window.is_focused().unwrap_or(false) && !window.is_minimized().unwrap_or(false)
-        })
+    windows.into_iter().find(|window| {
+        if !window.is_focused().unwrap_or(false) || window.is_minimized().unwrap_or(false) {
+            return false;
+        }
+        !is_own_window(&window.title().unwrap_or_default())
+    })
 }
 
 fn primary_monitor() -> Option<Monitor> {
@@ -79,9 +88,14 @@ pub fn capture_active_window() -> Result<ScreenshotResult, CaptureError> {
         }
         None => {
             let monitor = primary_monitor().ok_or(CaptureError::NoDisplay)?;
-            let label = monitor
-                .friendly_name()
-                .unwrap_or_else(|_| "screen".to_string());
+            // Windows hands back synthesised names like "Unknown Monitor
+            // 65537" for displays with no EDID name. Showing that as "what I
+            // captured" tells the user nothing and reads like a failure, so
+            // anything that is not a real display name becomes plain "Screen".
+            let label = match monitor.friendly_name() {
+                Ok(name) if !name.trim().is_empty() && !name.starts_with("Unknown Monitor") => name,
+                _ => "Screen".to_string(),
+            };
             let image = monitor
                 .capture_image()
                 .map_err(|e| CaptureError::Failed(e.to_string()))?;
@@ -95,4 +109,32 @@ pub fn capture_active_window() -> Result<ScreenshotResult, CaptureError> {
         png_base64: encode_png(&image)?,
         source,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_own_window;
+
+    #[test]
+    fn recognises_this_app_so_it_never_screenshots_itself() {
+        // Ctrl+B is pressed while the copilot has focus, which is exactly when
+        // this matters: without the check the vision model was handed a
+        // picture of Interview Copilot and described its own sidebar back to
+        // the candidate.
+        assert!(is_own_window("Interview Copilot"));
+        assert!(is_own_window("Interview Copilot Overlay"));
+        assert!(is_own_window("  Interview Copilot  "));
+    }
+
+    #[test]
+    fn leaves_the_windows_worth_capturing_alone() {
+        for title in [
+            "Zoom Meeting",
+            "Microsoft Teams",
+            "HackerRank - Google Chrome",
+            "Interview Copilot — design doc.docx",
+        ] {
+            assert!(!is_own_window(title), "{title} should still be capturable");
+        }
+    }
 }

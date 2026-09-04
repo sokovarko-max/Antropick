@@ -95,5 +95,7 @@
   "settings.ai.removeKey": "Remove key",
   "settings.ai.keySaved": "Key saved. It was not tested against the provider — use Test Connection to check it works.",
   "settings.ai.storageNotPersistent": "This build has no OS credential store, so a saved key is kept in memory only and is lost when the app closes. Use the Windows build for a key that persists.",
-  "live.answerLanguage": "Answer language"
+  "live.answerLanguage": "Answer language",
+  "settings.appearance.windowOpacity": "Window transparency",
+  "settings.appearance.windowOpacityHint": "Fades the whole app window, frame included, so you can see the screen behind it during a call. Windows only."
 }

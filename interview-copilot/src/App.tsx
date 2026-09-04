@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { NavSidebar } from "@/components/NavSidebar";
 import { DemoModeBanner } from "@/components/DemoModeBanner";
+import { useWindowOpacity } from "@/services/runtime/useWindowOpacity";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { SessionsPage } from "@/pages/SessionsPage";
 import { NewSessionPage } from "@/pages/NewSessionPage";
@@ -25,6 +26,10 @@ export default function App() {
   useEffect(() => {
     void hydrate();
   }, [hydrate]);
+
+  // Runs above every early return below, so the window keeps the translucency
+  // the user chose on the onboarding and loading screens too.
+  useWindowOpacity();
 
   // The Tauri "overlay" window loads this same SPA at #/overlay — it must
   // never be gated by onboarding or wrapped in the main app shell.

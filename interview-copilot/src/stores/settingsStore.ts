@@ -36,6 +36,8 @@ export interface SettingsState {
   framework: InterviewFramework;
   /** Opacity of the floating overlay panel, 0.3–1. */
   overlayOpacity: number;
+  /** Translucency of the main window itself, 0.3–1 (Windows only). */
+  windowOpacity: number;
   hotkeys: HotkeyBindings;
   privacy: PrivacySettings;
   costLimits: CostLimitSettings;
@@ -48,6 +50,7 @@ export interface SettingsState {
   setLocale: (locale: Locale) => void;
   setResponseMode: (mode: ResponseMode) => void;
   setOverlayOpacity: (opacity: number) => void;
+  setWindowOpacity: (opacity: number) => void;
   setFramework: (framework: InterviewFramework) => void;
   setHotkey: (action: keyof HotkeyBindings, combo: string) => void;
   setPrivacy: (patch: Partial<PrivacySettings>) => void;
@@ -66,6 +69,7 @@ export const useSettingsStore = create<SettingsState>()(
       responseMode: "SHORT",
       framework: "NONE",
       overlayOpacity: 1,
+      windowOpacity: 1,
       hotkeys: {
         askAi: "Ctrl+Q",
         screenshot: "Ctrl+B",
@@ -92,6 +96,10 @@ export const useSettingsStore = create<SettingsState>()(
       // impossible to find and fix) by dragging the slider to zero.
       setOverlayOpacity: (opacity) =>
         set({ overlayOpacity: Math.min(1, Math.max(0.3, opacity)) }),
+      // Same floor as the overlay, and for the same reason: a window faded to
+      // nothing cannot be found again to undo the setting.
+      setWindowOpacity: (opacity) =>
+        set({ windowOpacity: Math.min(1, Math.max(0.3, opacity)) }),
       setFramework: (framework) => set({ framework }),
       setHotkey: (action, combo) =>
         set((s) => ({ hotkeys: { ...s.hotkeys, [action]: combo } })),

@@ -44,6 +44,15 @@ xcap = "0.9"
 image = { version = "0.25", default-features = false, features = ["png"] }
 base64 = "0.22"
 
+# Window translucency is a layered-window attribute, not a WebView property:
+# it has to make the frame and title bar see-through too, which CSS cannot
+# reach. Tauri exposes no wrapper, so this is the one direct Win32 call.
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
 [profile.release]
 panic = "abort"
 codegen-units = 1

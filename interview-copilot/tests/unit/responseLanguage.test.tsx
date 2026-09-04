@@ -81,7 +81,9 @@ describe("VisionService", () => {
       recentTranscript: [],
       responseLanguage: "ru",
     });
-    expect(seen[0]).toContain("Response language: Russian");
+    expect(seen[0]).toContain("Write the entire reply in Russian");
+    // And the model is told not to think out loud, which is what leaked before.
+    expect(seen[0]).toMatch(/Do not emit a <think> block/i);
   });
 
   it("does not name a language the session did not ask for", async () => {
@@ -92,7 +94,7 @@ describe("VisionService", () => {
       recentTranscript: [],
       responseLanguage: "en",
     });
-    expect(seen[0]).toContain("Response language: English");
+    expect(seen[0]).toContain("Write the entire reply in English");
     expect(seen[0]).not.toContain("Russian");
   });
 });

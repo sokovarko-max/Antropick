@@ -327,6 +327,29 @@ export function SettingsPage() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-ink">
+                  {t("settings.appearance.windowOpacity")}
+                </span>
+                <span className="text-sm tabular-nums text-ink-muted">
+                  {Math.round(settings.windowOpacity * 100)}%
+                </span>
+              </div>
+              <input
+                type="range"
+                min={30}
+                max={100}
+                step={5}
+                value={Math.round(settings.windowOpacity * 100)}
+                onChange={(e) => settings.setWindowOpacity(Number(e.target.value) / 100)}
+                className="w-full accent-accent"
+              />
+              <p className="text-xs text-ink-faint">
+                {t("settings.appearance.windowOpacityHint")}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-ink">
                   {t("settings.appearance.overlayOpacity")}
                 </span>
                 <span className="text-sm tabular-nums text-ink-muted">

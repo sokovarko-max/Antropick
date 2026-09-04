@@ -46,6 +46,15 @@ pub fn secure_store_delete(key: String) -> Result<(), String> {
     security::delete(&key).map_err(|e| e.to_string())
 }
 
+/// Sets the main window's translucency (0.3–1.0; clamped in `window::`).
+#[tauri::command]
+pub fn set_window_opacity(app: AppHandle, opacity: f64) -> Result<(), String> {
+    if !opacity.is_finite() {
+        return Err("opacity must be a finite number".into());
+    }
+    crate::window::set_window_opacity(&app, opacity).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub fn capture_screenshot() -> Result<capture::ScreenshotResult, String> {
     capture::capture_active_window().map_err(|e| e.to_string())

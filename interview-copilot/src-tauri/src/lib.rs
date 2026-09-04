@@ -101,6 +101,7 @@ pub fn run() {
             commands::secure_store_get,
             commands::secure_store_delete,
             commands::secure_store_is_persistent,
+            commands::set_window_opacity,
             commands::capture_screenshot,
             commands::list_audio_devices,
             commands::start_audio_capture,

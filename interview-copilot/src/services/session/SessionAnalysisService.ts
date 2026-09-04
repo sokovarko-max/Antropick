@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { AIProvider } from "@/services/ai/types";
 import { languageName, loadPrompt, type ResponseLanguage } from "@/services/prompts/PromptLoader";
+import { stripReasoning } from "@/utils/parseAnswerFormat";
 import type { AIResponseRecord, SessionAnalysis, TranscriptSegment } from "@/types";
 
 const analysisSchema = z.object({
@@ -55,9 +56,12 @@ export class SessionAnalysisService {
       responseLanguage,
     });
 
-    const jsonStart = response.text.indexOf("{");
-    const jsonEnd = response.text.lastIndexOf("}");
-    const parsed = analysisSchema.parse(JSON.parse(response.text.slice(jsonStart, jsonEnd + 1)));
+    // Same reason as QuestionDetector: braces inside a <think> block would
+    // make this slice start in the middle of the model's deliberation.
+    const text = stripReasoning(response.text);
+    const jsonStart = text.indexOf("{");
+    const jsonEnd = text.lastIndexOf("}");
+    const parsed = analysisSchema.parse(JSON.parse(text.slice(jsonStart, jsonEnd + 1)));
 
     return { sessionId, ...parsed };
   }

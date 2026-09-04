@@ -22,3 +22,42 @@ describe("parseAnswerFormat", () => {
     expect(result.keyPoints).toEqual([]);
   });
 });
+
+describe("reasoning models", () => {
+  it("drops a <think> block instead of showing it as the answer", () => {
+    // Reported verbatim: a screenshot answer arrived as several hundred words
+    // of the model deliberating with itself, with the real answer buried at
+    // the end. Qwen serves VISION and always thinks out loud.
+    const raw =
+      "<think>\nThe user wants me to analyse a screenshot.\n**1. Identify what is shown:**\n- A desktop app.\n</think>\n\nANSWER:\nA settings screen.\n\nKEY POINTS:\n- Russian is selected";
+    const result = parseAnswerFormat(raw);
+    expect(result.answer).toBe("A settings screen.");
+    expect(result.answer).not.toContain("<think>");
+    expect(result.answer).not.toContain("deliberating");
+    expect(result.keyPoints).toEqual(["Russian is selected"]);
+  });
+
+  it("does not fall back to showing the scratchpad when the answer is unformatted", () => {
+    // The fallback path returns the whole text when there are no headers, so
+    // stripping has to happen before it, not after.
+    const result = parseAnswerFormat("<think>internal notes</think>\nJust the answer.");
+    expect(result.answer).toBe("Just the answer.");
+  });
+
+  it("shows nothing rather than raw thinking when the model was cut off mid-thought", () => {
+    // A response truncated by maxTokens has an opening tag and no closing one.
+    const result = parseAnswerFormat("<think>Let me work through this care");
+    expect(result.answer).toBe("");
+  });
+
+  it("handles the other tag names reasoning models use", () => {
+    expect(parseAnswerFormat("<thinking>x</thinking>ANSWER:\nok").answer).toBe("ok");
+    expect(parseAnswerFormat("<reasoning>x</reasoning>ANSWER:\nok").answer).toBe("ok");
+  });
+
+  it("leaves ordinary answers that merely discuss thinking untouched", () => {
+    // The word must not be enough to trigger stripping — only the tag.
+    const raw = "ANSWER:\nI think the bottleneck was the N+1 query.";
+    expect(parseAnswerFormat(raw).answer).toBe("I think the bottleneck was the N+1 query.");
+  });
+});

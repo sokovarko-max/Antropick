@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { AIProvider } from "@/services/ai/types";
 import { loadPrompt } from "@/services/prompts/PromptLoader";
+import { stripReasoning } from "@/utils/parseAnswerFormat";
 import type { QuestionDetectionResult, TranscriptSegment } from "@/types";
 
 const resultSchema = z.object({
@@ -61,8 +62,12 @@ export class QuestionDetector {
   }
 }
 
-function parseResult(raw: string): QuestionDetectionResult {
+function parseResult(rawWithReasoning: string): QuestionDetectionResult {
   try {
+    // A reasoning model's scratchpad routinely contains braces, so scanning
+    // the raw text for the first "{" would slice into the deliberation and
+    // fail to parse — silently downgrading every utterance to the fallback.
+    const raw = stripReasoning(rawWithReasoning);
     const jsonStart = raw.indexOf("{");
     const jsonEnd = raw.lastIndexOf("}");
     if (jsonStart === -1 || jsonEnd === -1) return FALLBACK;

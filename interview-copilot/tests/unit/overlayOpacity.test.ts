@@ -30,3 +30,34 @@ describe("overlay opacity setting", () => {
     expect(useSettingsStore.getState().overlayOpacity).toBe(1);
   });
 });
+
+describe("window translucency", () => {
+  it("clamps to a floor so the window can never be faded away entirely", () => {
+    // A window at 0% cannot be found again to undo the setting — the same
+    // reason the overlay slider has a floor.
+    useSettingsStore.getState().setWindowOpacity(0);
+    expect(useSettingsStore.getState().windowOpacity).toBe(0.3);
+
+    useSettingsStore.getState().setWindowOpacity(-5);
+    expect(useSettingsStore.getState().windowOpacity).toBe(0.3);
+  });
+
+  it("never exceeds fully opaque", () => {
+    useSettingsStore.getState().setWindowOpacity(2);
+    expect(useSettingsStore.getState().windowOpacity).toBe(1);
+  });
+
+  it("keeps a value inside the range as chosen", () => {
+    useSettingsStore.getState().setWindowOpacity(0.65);
+    expect(useSettingsStore.getState().windowOpacity).toBeCloseTo(0.65, 5);
+  });
+
+  it("is independent of the overlay panel's own opacity", () => {
+    // Two separate surfaces: fading the app window must not fade the overlay
+    // the candidate is reading from.
+    useSettingsStore.getState().setWindowOpacity(0.4);
+    useSettingsStore.getState().setOverlayOpacity(1);
+    expect(useSettingsStore.getState().windowOpacity).toBe(0.4);
+    expect(useSettingsStore.getState().overlayOpacity).toBe(1);
+  });
+});
