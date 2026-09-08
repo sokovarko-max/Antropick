@@ -8,7 +8,8 @@ const STORAGE_KEY = 'moyzal-v1';
 const SEED_EXERCISES = [
   // Грудь
   ['Жим штанги лёжа', 'Грудь'], ['Жим гантелей лёжа', 'Грудь'],
-  ['Жим на наклонной скамье', 'Грудь'], ['Разводка гантелей', 'Грудь'],
+  ['Жим на наклонной скамье', 'Грудь'], ['Жим гантелей на наклонной скамье', 'Грудь'],
+  ['Разводка гантелей', 'Грудь'],
   ['Сведение в кроссовере', 'Грудь'], ['Отжимания на брусьях', 'Грудь'],
   ['Отжимания от пола', 'Грудь'],
   // Спина
@@ -37,6 +38,7 @@ const SEED_EXERCISES = [
   // Кардио
   ['Беговая дорожка (мин)', 'Кардио'], ['Велотренажёр (мин)', 'Кардио'],
   ['Эллипс (мин)', 'Кардио'], ['Скакалка (мин)', 'Кардио'],
+  ['Ходьба в гору (мин)', 'Кардио'], ['Бег (км)', 'Кардио'],
 ];
 
 const GROUP_ORDER = ['Грудь', 'Спина', 'Ноги', 'Плечи', 'Бицепс', 'Трицепс', 'Пресс', 'Кардио', 'Другое'];
@@ -1209,9 +1211,9 @@ function openProgramDetail(prog, custom) {
       ${prog.days.map((d, di) => `
         <div class="card">
           <div class="ex-title"><span>${esc(d.name)}</span></div>
-          ${d.items.map(([name, sets, reps]) => `
+          ${d.items.map(([name, sets, reps, note]) => `
             <div class="prog-ex-row">
-              <span>${esc(name)}</span>
+              <span>${esc(name)}${note ? `<span class="sub" style="display:block">${esc(note)}</span>` : ''}</span>
               <span style="white-space:nowrap"><b>${sets}×${esc(String(reps))}</b>
                 <button class="icon-btn" data-video="${esc(name)}" title="Видео техники">▶</button>
               </span>
@@ -1257,14 +1259,17 @@ function openProgramDetail(prog, custom) {
 function exIdByName(name) {
   let ex = state.exercises.find(e => e.name === name);
   if (!ex) {
-    ex = { id: uid(), name, group: 'Другое', custom: true };
+    // упражнения из программ есть в библиотеке — берём их группу мышц,
+    // иначе это действительно новое упражнение пользователя
+    const seed = SEED_EXERCISES.find(([n]) => n === name);
+    ex = { id: uid(), name, group: seed ? seed[1] : 'Другое', custom: !seed };
     state.exercises.push(ex);
   }
   return ex.id;
 }
 
 function startWorkoutFromDay(day) {
-  const entries = day.items.map(([name, sets, reps]) => {
+  const entries = day.items.map(([name, sets, reps, note]) => {
     const exId = exIdByName(name);
     const prev = lastSetsFor(exId);
     const repNum = parseInt(String(reps), 10) || 0;
@@ -1273,7 +1278,8 @@ function startWorkoutFromDay(day) {
       const p = prev[i] || prev[prev.length - 1];
       setArr.push({ w: p ? p.w : 0, r: p ? p.r : repNum, done: false });
     }
-    return { exId, sets: setArr, target: `${sets}×${reps}` };
+    // отдых и RIR из программы держим перед глазами во время подхода
+    return { exId, sets: setArr, target: `${sets}×${reps}${note ? ' · ' + note : ''}` };
   });
   state.active = { start: Date.now(), entries };
   save();
